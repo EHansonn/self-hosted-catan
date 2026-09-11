@@ -1,0 +1,17 @@
+# Let major search engines read the site's noindex response, so the URL is
+# removed rather than appearing as an unlabelled, robots-blocked result.
+User-agent: Googlebot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+User-agent: DuckDuckBot
+Allow: /
+
+User-agent: Applebot
+Allow: /
+
+# All other standards-compliant crawlers should stay out.
+User-agent: *
+Disallow: /
