@@ -1,0 +1,34 @@
+name: self-hosted-crossroads
+services:
+  game:
+    build: .
+    restart: unless-stopped
+    init: true
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${PORT:-8080}:8080"
+    volumes:
+      - game-data:/app/data
+    environment:
+      APP_NAME: ${APP_NAME:-Crossroads}
+      ROOM_CREATE_PASSWORD: ${ROOM_CREATE_PASSWORD:-}
+      SECURE_COOKIE: ${SECURE_COOKIE:-false}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
+      TRUST_PROXY_HEADERS: ${TRUST_PROXY_HEADERS:-false}
+      PLAYER_DISCONNECT_GRACE_MS: ${PLAYER_DISCONNECT_GRACE_MS:-120000}
+    mem_limit: ${GAME_MEMORY_LIMIT:-256m}
+    cpus: ${GAME_CPU_LIMIT:-0.50}
+    pids_limit: 64
+    read_only: true
+    tmpfs:
+      - /tmp:size=8m,noexec,nosuid
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "2m"
+        max-file: "2"
+volumes:
+  game-data:

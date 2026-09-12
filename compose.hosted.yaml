@@ -1,0 +1,70 @@
+name: crossroads-hosted
+
+services:
+  game:
+    build:
+      context: .
+    restart: unless-stopped
+    init: true
+    expose:
+      - "8080"
+    volumes:
+      - game-data:/app/data
+    environment:
+      APP_NAME: ${APP_NAME:-Crossroads}
+      ROOM_CREATE_PASSWORD: ${ROOM_CREATE_PASSWORD:?set ROOM_CREATE_PASSWORD in .env}
+      SECURE_COOKIE: "true"
+      ALLOWED_ORIGINS: https://${PUBLIC_HOSTNAME:?set PUBLIC_HOSTNAME in .env}
+      TRUST_PROXY_HEADERS: "true"
+      PLAYER_DISCONNECT_GRACE_MS: ${PLAYER_DISCONNECT_GRACE_MS:-120000}
+    mem_limit: ${GAME_MEMORY_LIMIT:-256m}
+    cpus: ${GAME_CPU_LIMIT:-0.50}
+    pids_limit: 64
+    read_only: true
+    tmpfs:
+      - /tmp:size=8m,noexec,nosuid
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "2m"
+        max-file: "2"
+    networks:
+      backend:
+        aliases:
+          # Keeps existing Cloudflare routes using caddy:8080 working.
+          - caddy
+
+  cloudflared:
+    image: cloudflare/cloudflared:2026.9.1@sha256:b269e8abd07a5bf6f3f4be65d5050b2174eca89c56a0241a8ff32a16aec454e4
+    restart: unless-stopped
+    depends_on:
+      game:
+        condition: service_healthy
+    environment:
+      TUNNEL_TOKEN: ${CF_TUNNEL_TOKEN:?set CF_TUNNEL_TOKEN in .env}
+    command: tunnel --no-autoupdate run
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "2m"
+        max-file: "2"
+    networks:
+      - backend
+      - edge
+
+volumes:
+  game-data:
+
+networks:
+  backend:
+    internal: true
+  edge:
