@@ -2000,9 +2000,9 @@ export function App() {
                 <span className="eyebrow">SHARED HISTORY</span>
                 <h2 id="community-title">Leaderboard &amp; Flock</h2>
                 <p>
-                  Games that begin with at least three players are official.
-                  Disconnects, bot takeovers and automated turns do not remove
-                  them from the record.
+                  Games that begin with at least three human players are
+                  official. Disconnects, bot takeovers and automated turns do
+                  not remove them from the record.
                 </p>
               </div>
               <strong>{community.totalGames} official games</strong>
@@ -2074,7 +2074,7 @@ export function App() {
                   <div className="community-empty">
                     <Trophy size={30} />
                     <strong>The first crown is waiting.</strong>
-                    <span>Finish a game with at least three starting players to begin the standings.</span>
+                    <span>Finish a game that starts with at least three human players to begin the standings.</span>
                   </div>
                 )}
               </article>
@@ -2137,7 +2137,7 @@ export function App() {
                 <p>
                   {gameResults.official
                     ? `Official game ${gameResults.roomCode}. The winner earned a sheep to name.`
-                    : `Friendly game ${gameResults.roomCode}. Games need at least three starting players to count.`}
+                    : `Friendly game ${gameResults.roomCode}. Games need at least three human players at the start to count.`}
                 </p>
               </div>
             </header>

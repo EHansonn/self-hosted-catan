@@ -45,6 +45,7 @@ export interface PublicSheepNamingRight {
 }
 
 export interface CommunityState {
+  eligibilityVersion: number;
   totalGames: number;
   scores: LeaderboardScore[];
   flock: FlockSheep[];
@@ -64,6 +65,7 @@ export interface OfficialGameResult {
   roomCode: string;
   completedAt: number;
   eligible: boolean;
+  startingHumanPlayers: number;
   winnerId: string;
   players: {
     id: string;
@@ -74,9 +76,11 @@ export interface OfficialGameResult {
 }
 
 const MAX_RECORDED_MATCHES = 10_000;
+const CURRENT_ELIGIBILITY_VERSION = 2;
 
 export function emptyCommunity(): CommunityState {
   return {
+    eligibilityVersion: CURRENT_ELIGIBILITY_VERSION,
     totalGames: 0,
     scores: [],
     flock: [],
@@ -88,7 +92,13 @@ export function emptyCommunity(): CommunityState {
 export function hydrateCommunity(value: unknown): CommunityState {
   if (!value || typeof value !== "object") return emptyCommunity();
   const saved = value as Partial<CommunityState>;
+  // Earlier records counted bots as starting players and mixed their scores
+  // into the leaderboard. Those aggregates cannot be separated reliably, so
+  // reset them once when adopting the human-only eligibility rules.
+  if (saved.eligibilityVersion !== CURRENT_ELIGIBILITY_VERSION)
+    return emptyCommunity();
   return {
+    eligibilityVersion: CURRENT_ELIGIBILITY_VERSION,
     totalGames:
       Number.isInteger(saved.totalGames) && (saved.totalGames || 0) >= 0
         ? saved.totalGames!
@@ -113,19 +123,20 @@ export function recordOfficialGame(
     !result.eligible ||
     !result.winnerId ||
     result.players.length < 3 ||
+    result.startingHumanPlayers < 3 ||
     community.recordedMatches.includes(result.matchId)
   )
     return false;
 
-  const winner = result.players.find((player) => player.id === result.winnerId);
-  if (!winner) return false;
+  const humanPlayers = result.players.filter((player) => !player.bot);
+  const winner = humanPlayers.find((player) => player.id === result.winnerId);
 
   community.recordedMatches.push(result.matchId);
   if (community.recordedMatches.length > MAX_RECORDED_MATCHES)
     community.recordedMatches.shift();
   community.totalGames++;
 
-  for (const player of result.players) {
+  for (const player of humanPlayers) {
     const key = playerKey(player.name);
     let score = community.scores.find((entry) => entry.key === key);
     if (!score) {
@@ -146,15 +157,16 @@ export function recordOfficialGame(
     if (player.id === result.winnerId) score.wins++;
   }
 
-  community.pendingSheep.push({
-    matchId: result.matchId,
-    roomCode: result.roomCode,
-    winnerId: winner.id,
-    winner: winner.name,
-    wonAt: result.completedAt,
-    players: result.players.length,
-    score: winner.points,
-  });
+  if (winner)
+    community.pendingSheep.push({
+      matchId: result.matchId,
+      roomCode: result.roomCode,
+      winnerId: winner.id,
+      winner: winner.name,
+      wonAt: result.completedAt,
+      players: result.startingHumanPlayers,
+      score: winner.points,
+    });
   return true;
 }
 

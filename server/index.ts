@@ -151,6 +151,7 @@ interface Room {
   matchId?: string;
   recordedMatchId?: string;
   leaderboardEligible?: boolean;
+  startingHumanPlayers?: number;
 }
 const sessions = new Map<string, Session>(),
   rooms = new Map<string, Room>(),
@@ -183,10 +184,13 @@ if (existsSync(storePath)) {
         r.game.resumeTime ??= null;
         resetDeadline(r.game);
         r.matchId ||= randomBytes(12).toString("hex");
-        // Official status is determined once by the number of starting seats.
-        // Game seats are never removed after play begins, so this also upgrades
-        // in-progress saves created under the older, stricter bot policy.
-        r.leaderboardEligible = r.game.players.length > 2;
+        // Human session IDs never use the bot prefix, even if the host later
+        // replaces that seat with a bot. This preserves start-of-game status
+        // while correcting saves made under the old total-seat rule.
+        r.startingHumanPlayers ??= r.game.players.filter(
+          (player) => !player.id.startsWith("bot-"),
+        ).length;
+        r.leaderboardEligible = r.startingHumanPlayers >= 3;
         r.disconnectedSince = Object.fromEntries(
           Object.entries(r.disconnectedSince || {}).filter(
             ([playerId, timestamp]) =>
@@ -835,6 +839,9 @@ function settleFinishedRoom(room: Room) {
     roomCode: room.code,
     completedAt: room.updated,
     eligible: room.leaderboardEligible === true,
+    startingHumanPlayers:
+      room.startingHumanPlayers ??
+      game.players.filter((player) => !player.id.startsWith("bot-")).length,
     winnerId: game.winner,
     players: game.players.map((player) => ({
       id: player.id,
@@ -1263,7 +1270,8 @@ io.on("connection", (socket) => {
         );
         r.matchId = randomBytes(12).toString("hex");
         r.recordedMatchId = undefined;
-        r.leaderboardEligible = r.players.length > 2;
+        r.startingHumanPlayers = r.players.filter((player) => !player.bot).length;
+        r.leaderboardEligible = r.startingHumanPlayers >= 3;
         delete r.disconnectedSince;
         delete r.automaticTakeovers;
         changed(r);

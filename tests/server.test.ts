@@ -223,6 +223,7 @@ test("packaged server: guest joins, creator-only rooms, scaled tables, privacy, 
     );
     for (let i = 1; i < 12; i++)
       assert.ok((await host.cmd({ type: "bot" })).ok);
+    const largeRoomCode = host.state!.code;
     assert.equal(host.state!.players.length, 12);
     assert.equal(new Set(host.state!.players.map((player) => player.color)).size, 12);
     const largeRoomBotNames = host.state!.players
@@ -232,6 +233,14 @@ test("packaged server: guest joins, creator-only rooms, scaled tables, privacy, 
     assert.ok(largeRoomBotNames.every((name) => !/^Bot(?: |$)/.test(name)));
     assert.ok((await host.cmd({ type: "start" })).ok);
     assert.equal(host.state!.game!.board.tiles.length, 61);
+    const botMatchSnapshot = JSON.parse(
+      readFileSync(join(dir, "state.json"), "utf8"),
+    );
+    const botMatchRoom = botMatchSnapshot.rooms.find(
+      (room: { code: string }) => room.code === largeRoomCode,
+    );
+    assert.equal(botMatchRoom.startingHumanPlayers, 1);
+    assert.equal(botMatchRoom.leaderboardEligible, false);
     assert.ok((await host.cmd({ type: "close" })).ok);
     assert.ok(
       (

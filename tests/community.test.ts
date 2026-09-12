@@ -14,6 +14,7 @@ const result = (changes: Partial<OfficialGameResult> = {}): OfficialGameResult =
   roomCode: "ABC123",
   completedAt: 1_700_000_000_000,
   eligible: true,
+  startingHumanPlayers: 4,
   winnerId: "p1",
   players: [
     { id: "p1", name: "Casey", points: 10, bot: false },
@@ -53,15 +54,21 @@ test("bot takeovers do not disqualify an official game", () => {
   assert.equal(
     recordOfficialGame(
       community,
-      result({ players: [...result().players.slice(0, 3), { id: "bot", name: "Mira", points: 4, bot: true }] }),
+      result({
+        players: [
+          ...result().players.slice(0, 3),
+          { id: "p4", name: "Mira", points: 4, bot: true },
+        ],
+      }),
     ),
     true,
   );
   assert.equal(community.totalGames, 1);
-  assert.equal(community.scores.find((score) => score.name === "Mira")?.games, 1);
+  assert.equal(community.scores.some((score) => score.name === "Mira"), false);
+  assert.equal(viewCommunity(community, "p1").pendingSheep[0].players, 4);
 });
 
-test("ineligible and two-player games stay out of community history", () => {
+test("ineligible games and games starting with fewer than three humans stay out", () => {
   const community = emptyCommunity();
   assert.equal(recordOfficialGame(community, result({ eligible: false })), false);
   assert.equal(
@@ -69,13 +76,52 @@ test("ineligible and two-player games stay out of community history", () => {
       community,
       result({
         matchId: "match-2",
+        startingHumanPlayers: 2,
         players: result().players.slice(0, 2),
+      }),
+    ),
+    false,
+  );
+  assert.equal(
+    recordOfficialGame(
+      community,
+      result({
+        matchId: "match-3",
+        startingHumanPlayers: 1,
+        players: [
+          result().players[0],
+          { id: "bot-1", name: "Cricket", points: 7, bot: true },
+          { id: "bot-2", name: "Dune", points: 6, bot: true },
+          { id: "bot-3", name: "Nori", points: 5, bot: true },
+        ],
       }),
     ),
     false,
   );
   assert.equal(community.totalGames, 0);
   assert.deepEqual(community.scores, []);
+  assert.deepEqual(community.pendingSheep, []);
+});
+
+test("a bot winner never appears on the leaderboard or earns a sheep", () => {
+  const community = emptyCommunity();
+  assert.equal(
+    recordOfficialGame(
+      community,
+      result({
+        winnerId: "bot-1",
+        startingHumanPlayers: 3,
+        players: [
+          ...result().players.slice(0, 3),
+          { id: "bot-1", name: "Cricket", points: 10, bot: true },
+        ],
+      }),
+    ),
+    true,
+  );
+  assert.equal(community.totalGames, 1);
+  assert.equal(community.scores.some((score) => score.name === "Cricket"), false);
+  assert.deepEqual(community.pendingSheep, []);
 });
 
 test("only the winner can use a naming right and each sheep is named once", () => {
@@ -121,4 +167,18 @@ test("sheep names are bounded, meaningful, unique and restart-safe", () => {
   assert.equal(restored.totalGames, 2);
   assert.equal(restored.flock[0].name, "Baa-rbara");
   assert.equal(viewCommunity(restored, "p1").pendingSheep.length, 1);
+});
+
+test("leaderboards recorded under the bot-counting rule reset once", () => {
+  const legacy = { ...emptyCommunity(), eligibilityVersion: 1 };
+  legacy.totalGames = 1;
+  legacy.scores.push({
+    key: "cricket",
+    name: "Cricket",
+    wins: 0,
+    games: 1,
+    points: 7,
+    lastPlayed: 1,
+  });
+  assert.deepEqual(hydrateCommunity(legacy), emptyCommunity());
 });
