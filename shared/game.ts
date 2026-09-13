@@ -875,6 +875,38 @@ export function robberSites(g: Game, p: Player) {
     )
     .map((t) => t.id);
 }
+export function hasSpecialBuildAction(g: Game, p: Player) {
+  if (
+    !g.secondary ||
+    g.phase !== "main" ||
+    g.players[g.current]?.id !== p.id
+  )
+    return false;
+  if (
+    (settlementSites(g, p).length && canPay(p, COSTS.settlement)) ||
+    (citySites(g, p).length && canPay(p, COSTS.city)) ||
+    (roadSites(g, p).length && canPay(p, COSTS.road)) ||
+    (g.deck.length && canPay(p, COSTS.development))
+  )
+    return true;
+  const rates = ratios(g, p);
+  if (
+    RESOURCES.some(
+      (give) =>
+        p.resources[give] >= rates[give] &&
+        RESOURCES.some((want) => want !== give && g.bank[want] > 0),
+    )
+  )
+    return true;
+  if (p.playedDev) return false;
+  return p.dev.some((card) => {
+    if (card.bought >= g.turn || card.type === "victory") return false;
+    if (card.type === "roadBuilding") return roadSites(g, p).length > 0;
+    if (card.type === "plenty") return total(g.bank) >= 2;
+    if (card.type === "knight") return robberSites(g, p).length > 0;
+    return card.type === "monopoly";
+  });
+}
 export function roadLength(g: Game, p: Player) {
   const walk = (v: number, used: Set<number>): number => {
     if (
@@ -1000,6 +1032,22 @@ function startTurn(g: Game) {
   g.dice = [];
   resetDeadline(g);
 }
+function finishEmptySpecialBuild(g: Game) {
+  if (!g.secondary || g.phase !== "main") return;
+  const player = g.players[g.current];
+  if (hasSpecialBuildAction(g, player)) return;
+  if (player.bot && !g.specialBuildRequests.includes(player.id))
+    g.specialBuildRequests.push(player.id);
+  note(
+    g,
+    `${player.name} has no available actions, so their special build phase ends automatically.`,
+    "special",
+  );
+  g.secondary = false;
+  g.primary = (g.primary + 1) % g.players.length;
+  g.current = g.primary;
+  startTurn(g);
+}
 function handValid(h: Hand) {
   return (
     h &&
@@ -1067,6 +1115,7 @@ export function applyAction(
   }
   g.version++;
   awards(g);
+  if (g.phase !== "finished") finishEmptySpecialBuild(g);
   return g;
 }
 export function toggleSpecialBuildRequest(game: Game, playerId: string): Game {

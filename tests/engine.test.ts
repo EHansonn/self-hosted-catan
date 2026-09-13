@@ -26,6 +26,7 @@ import {
   phaseTimerSeconds,
   canResumeRoom,
   toggleSpecialBuildRequest,
+  hasSpecialBuildAction,
 } from "../shared/game";
 import { chooseBotAction, chooseTimeoutAction } from "../shared/bot";
 const fresh = (n = 4, seed = 22, difficulty: Difficulty = "normal") =>
@@ -89,6 +90,13 @@ function grant(g: Game, id: string, h: Partial<Hand>) {
     const n = h[r] || 0;
     p.resources[r] += n;
     g.bank[r] -= n;
+  }
+}
+function clearResources(g: Game, id: string) {
+  const player = g.players.find((candidate) => candidate.id === id)!;
+  for (const resource of RESOURCES) {
+    g.bank[resource] += player.resources[resource];
+    player.resources[resource] = 0;
   }
 }
 test("boards scale from 2–12 players with valid topology, number bags, balanced red numbers and ports", () => {
@@ -761,6 +769,7 @@ test("special build phases only run for an advance flag three seats ahead", () =
   assert.equal(g.secondary, false);
 
   g.phase = "main";
+  grant(g, "p4", { wood: 1, brick: 1 });
   g = toggleSpecialBuildRequest(g, "p4");
   assert.deepEqual(g.specialBuildRequests, ["p4"]);
   g = applyAction(g, "p1", { type: "end" });
@@ -787,6 +796,54 @@ test("special build phases only run for an advance flag three seats ahead", () =
   assert.equal(g.primary, 2);
   assert.equal(g.phase, "roll");
 });
+test("empty special build phases end automatically", () => {
+  let g = setup(fresh(6));
+  g.players.forEach((player) => (player.bot = false));
+  clearResources(g, "p3");
+  g.players[3].dev = [];
+  g.phase = "main";
+  g.specialBuildRequests = ["p3"];
+  g = applyAction(g, "p0", { type: "end" });
+  assert.equal(g.secondary, false);
+  assert.equal(g.primary, 1);
+  assert.equal(g.current, 1);
+  assert.equal(g.phase, "roll");
+  assert.match(g.log.at(-1)?.text || "", /ends automatically/);
+});
+test("special build phases remain open while a legal action exists", () => {
+  let g = setup(fresh(6));
+  g.players.forEach((player) => (player.bot = false));
+  clearResources(g, "p3");
+  g.players[3].dev = [];
+  grant(g, "p3", { wood: 1, brick: 1 });
+  g.phase = "main";
+  g.specialBuildRequests = ["p3"];
+  g = applyAction(g, "p0", { type: "end" });
+  assert.equal(g.secondary, true);
+  assert.equal(g.current, 3);
+  assert.equal(hasSpecialBuildAction(g, g.players[3]), true);
+  g = applyAction(g, "p3", {
+    type: "road",
+    id: roadSites(g, g.players[3])[0],
+  });
+  assert.equal(g.secondary, false);
+  assert.equal(g.primary, 1);
+  assert.equal(g.phase, "roll");
+  assert.match(g.log.at(-1)?.text || "", /ends automatically/);
+});
+test("bank trades and playable development cards keep special builds open", () => {
+  const g = setup(fresh(6));
+  g.secondary = true;
+  g.current = 3;
+  g.phase = "main";
+  clearResources(g, "p3");
+  g.players[3].dev = [];
+  grant(g, "p3", { wood: 4 });
+  assert.equal(hasSpecialBuildAction(g, g.players[3]), true);
+  clearResources(g, "p3");
+  g.players[3].dev.push({ type: "monopoly", bought: g.turn - 1 });
+  assert.equal(hasSpecialBuildAction(g, g.players[3]), true);
+});
 test("special build flags can be cancelled and cannot be changed on your own turn", () => {
   let g = setup(fresh(6));
   g.players.forEach((player) => (player.bot = false));
@@ -804,6 +861,7 @@ test("special build flags can be cancelled and cannot be changed on your own tur
 test("bot special build flags are consumed and queued again", () => {
   let g = setup(fresh(6));
   g.phase = "main";
+  grant(g, "p3", { wood: 1, brick: 1 });
   g = applyAction(g, "p0", { type: "end" });
   assert.equal(g.current, 3);
   assert.equal(g.phase, "main");
