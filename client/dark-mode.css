@@ -65,7 +65,7 @@ html[data-color-theme="dark"] .sheep-rights span,
 html[data-color-theme="dark"] .resume-card,
 html[data-color-theme="dark"] .resume-copy small,
 html[data-color-theme="dark"] .resume-meta small,
-html[data-color-theme="dark"] .resume-copy .resume-identity,
+html[data-color-theme="dark"] .resume-name,
 html[data-color-theme="dark"] .resume-switch {
   color: #c8d8e2;
 }

@@ -269,6 +269,7 @@ export function App() {
     [gameResults, setGameResults] = useState<GameResults | null>(null),
     [pending, setPending] = useState(false);
   const [name, setName] = useState(""),
+    [resumeName, setResumeName] = useState(""),
     [creationPassword, setCreationPassword] = useState(""),
     [code, setCode] = useState(
       () => new URLSearchParams(location.search).get("room") || "",
@@ -548,17 +549,19 @@ export function App() {
     s.on("connect", () => {
       setConnected(true);
       const active = roomRef.current;
-      const linkedRoom = new URLSearchParams(location.search)
-        .get("room")
-        ?.toUpperCase();
       const reconnectCommand = active
         ? {
             type: active.spectator ? "spectate" : "resume",
             code: active.code,
+            ...(active.spectator
+              ? {}
+              : {
+                  name: active.players.find(
+                    (player) => player.id === active.me,
+                  )?.name,
+                }),
           }
-        : linkedRoom && /^[A-Z0-9]{6}$/.test(linkedRoom)
-          ? { type: "spectate", code: linkedRoom }
-          : { type: "home" };
+        : { type: "home" };
       s.emit(
         "command",
         reconnectCommand,
@@ -566,8 +569,6 @@ export function App() {
           if (!response?.ok && active) {
             roomRef.current = null;
             setRoom(null);
-            s.emit("command", { type: "home" }, () => {});
-          } else if (!response?.ok && reconnectCommand.type === "spectate") {
             s.emit("command", { type: "home" }, () => {});
           }
         },
@@ -715,8 +716,12 @@ export function App() {
       if (entry === "host") setCreationPassword("");
     }
   };
-  const resumeGame = (roomCode: string) =>
-    command({ type: "resume", code: roomCode });
+  const resumeGame = async (roomCode: string) => {
+    if (
+      await command({ type: "resume", code: roomCode, name: resumeName })
+    )
+      setResumeName("");
+  };
   const goHome = async () => {
     if (!(await command({ type: "home" }))) return false;
     history.replaceState(null, "", location.pathname);
@@ -1707,9 +1712,13 @@ export function App() {
                       : "Game in progress"
                     : "Waiting in lobby";
                 return (
-                  <article
+                  <form
                     className="resume-card"
                     key={saved.code}
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      void resumeGame(saved.code);
+                    }}
                   >
                     <span className="resume-code">{saved.code}</span>
                     <span className="resume-copy">
@@ -1718,9 +1727,6 @@ export function App() {
                       </strong>
                       <small>
                         {saved.players.map((p) => p.name).join(", ")}
-                      </small>
-                      <small className="resume-identity">
-                        This browser is recognized as {saved.playerName}.
                       </small>
                     </span>
                     <span className="resume-meta">
@@ -1731,22 +1737,35 @@ export function App() {
                       </small>
                     </span>
                     <span className="resume-controls">
+                      <label className="resume-name">
+                        <span>Your name</span>
+                        <input
+                          aria-label={`Your name for room ${saved.code}`}
+                          value={resumeName}
+                          onChange={(event) => setResumeName(event.target.value)}
+                          required
+                          maxLength={20}
+                          autoComplete="off"
+                          placeholder="Enter your name"
+                        />
+                      </label>
                       <button
+                        type="submit"
                         className="resume-action"
-                        disabled={pending || !connected}
-                        onClick={() => void resumeGame(saved.code)}
+                        disabled={pending || !connected || !resumeName.trim()}
                       >
-                        <Play size={16} /> Reconnect as {saved.playerName}
+                        <Play size={16} /> Reconnect
                       </button>
                       <button
+                        type="button"
                         className="resume-switch"
                         disabled={pending}
                         onClick={() => setModal("identity")}
                       >
-                        Not {saved.playerName}?
+                        Use a different identity
                       </button>
                     </span>
-                  </article>
+                  </form>
                 );
               })}
             </div>
@@ -1973,21 +1992,15 @@ export function App() {
                 <form className="entry-form" onSubmit={createOrJoin}>
                   <label className="field">
                     <span>
-                      {entry === "host"
-                        ? "Your name"
-                        : "Your name (only needed for an open seat)"}
+                      Your name
                     </span>
                     <input
                       aria-label="Your name"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      required={entry === "host"}
+                      required
                       maxLength={20}
-                      placeholder={
-                        entry === "host"
-                          ? "What should we call you?"
-                          : "Optional when watching a game"
-                      }
+                      placeholder="What should we call you?"
                       autoComplete="off"
                     />
                   </label>
@@ -2298,9 +2311,9 @@ export function App() {
         <DialogContent className="game-dialog identity-dialog">
           <DialogTitle>Who is using this browser?</DialogTitle>
           <DialogDescription>
-            This browser has a private key saved for {resumeRooms[0]?.playerName || "a player"}.
-            It is not based on your Wi-Fi or IP address, so people on the same
-            network receive separate identities on their own devices.
+            This browser has a private key for reconnecting to an existing seat.
+            It is not based on your Wi-Fi or IP address, and your name is never
+            filled in automatically.
           </DialogDescription>
           <div className="identity-explainer">
             <Shield size={28} aria-hidden="true" />
@@ -2312,7 +2325,7 @@ export function App() {
           </div>
           <div className="identity-actions">
             <button className="btn subtle" onClick={() => setModal(null)}>
-              Keep {resumeRooms[0]?.playerName || "this identity"}
+              Keep this identity
             </button>
             <button
               className="btn primary"

@@ -99,7 +99,15 @@ test("empty started games close after a restart-safe grace period", async () => 
     assert.ok((await client.command({ type: "home" })).ok);
     await delay(350);
     const firstCode = client.resumable[0].code;
-    assert.ok((await client.command({ type: "resume", code: firstCode })).ok);
+    assert.ok(
+      (
+        await client.command({
+          type: "resume",
+          code: firstCode,
+          name: "Human",
+        })
+      ).ok,
+    );
     await delay(800);
     assert.ok((await client.command({ type: "home" })).ok);
     assert.equal(client.resumable[0].code, firstCode);

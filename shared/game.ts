@@ -306,7 +306,6 @@ export interface RoomView {
 
 export interface ResumeRoomView {
   code: string;
-  playerName: string;
   options: Options;
   players: Pick<PublicPlayer, "name" | "color" | "bot">[];
   started: boolean;

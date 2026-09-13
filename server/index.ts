@@ -810,7 +810,6 @@ function resumeRooms(session: Session): ResumeRoomView[] {
   return [
     {
       code: room.code,
-      playerName: seatedPlayer.name,
       options: room.options,
       players: players.map(({ name, color, bot }) => ({ name, color, bot })),
       started: !!room.game,
@@ -1094,6 +1093,7 @@ io.on("connection", (socket) => {
           };
           rooms.set(code, r);
         } else {
+          name = playerName.parse(command.name);
           const code = z
             .string()
             .regex(/^[A-Z0-9]{6}$/)
@@ -1102,9 +1102,16 @@ io.on("connection", (socket) => {
           if (r.game) {
             if (r.game.phase === "finished")
               fail("That game has already finished.");
-            const seated =
-              session.room === r.code &&
-              r.players.some((player) => player.id === session.id);
+            const seatedPlayer =
+              session.room === r.code
+                ? r.players.find((player) => player.id === session.id)
+                : undefined;
+            const seated = !!seatedPlayer;
+            if (
+              seatedPlayer &&
+              playerNameKey(seatedPlayer.name) !== playerNameKey(name)
+            )
+              fail("Enter the name used for your saved seat.");
             const unattended = seated && !hasHumanViewer(r);
             socket.data.room = r.code;
             socket.data.spectator = !seated;
@@ -1115,7 +1122,6 @@ io.on("connection", (socket) => {
           if (savedRoom && canResumeRoom(savedRoom.game))
             fail("Leave your current room before joining another.");
           if (r.players.length >= r.options.seats) fail("This room is full.");
-          name = playerName.parse(command.name);
           ensurePlayerNameAvailable(r, name);
           releaseFinishedRoom(session, savedRoom);
         }
@@ -1137,6 +1143,7 @@ io.on("connection", (socket) => {
         return ack({ ok: true });
       }
       if (command.type === "resume") {
+        const name = playerName.parse(command.name);
         const code = z.string().regex(/^[A-Z0-9]{6}$/).parse(command.code);
         const r =
           savedRoom &&
@@ -1145,6 +1152,9 @@ io.on("connection", (socket) => {
           savedRoom.players.some((p) => p.id === session.id)
             ? savedRoom
             : fail("That saved game is no longer available.");
+        const seatedPlayer = r.players.find((player) => player.id === session.id)!;
+        if (playerNameKey(seatedPlayer.name) !== playerNameKey(name))
+          fail("Enter the name used for your saved seat.");
         const unattended = !!r.game && !hasHumanViewer(r);
         socket.data.room = r.code;
         socket.data.spectator = false;
