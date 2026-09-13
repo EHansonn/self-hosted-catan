@@ -106,6 +106,7 @@ export interface Options {
   target: number;
   difficulty: Difficulty;
   timer: number;
+  turnActionBonus: number;
   setupSettlementTimer: number;
   setupRoadTimer: number;
   actionTimer: number;
@@ -120,6 +121,7 @@ export const DEFAULT_OPTIONS: Options = {
   target: 10,
   difficulty: "normal",
   timer: 60,
+  turnActionBonus: 15,
   setupSettlementTimer: 120,
   setupRoadTimer: 20,
   actionTimer: 10,
@@ -1034,7 +1036,20 @@ export function applyAction(
   action: Action,
 ): Game {
   const g = structuredClone(game);
+  const earnsTurnTime =
+    !game.phase.startsWith("setup") &&
+    ["settlement", "city", "road", "dev"].includes(action.type);
+  const hasTimedTurn =
+    game.phase === "freeRoad"
+      ? game.resumeTime !== null
+      : game.deadline !== null;
   mutate(g, playerId, action);
+  if (earnsTurnTime && hasTimedTurn) {
+    const bonus =
+      (g.options.turnActionBonus ?? DEFAULT_OPTIONS.turnActionBonus) * 1000;
+    if (bonus && g.resumeTime !== null) g.resumeTime += bonus;
+    else if (bonus && g.deadline !== null) g.deadline += bonus;
+  }
   g.version++;
   awards(g);
   return g;

@@ -581,6 +581,80 @@ test("required actions, discards and main turns use their own clocks", () => {
   assert.ok(roads.deadline! > Date.now() + 57000);
   invariant(roads);
 });
+test("builds and played development cards add configurable time to the active turn", () => {
+  const bonusMs = 15_000;
+  let g = setup(fresh());
+  g.phase = "main";
+  g.options.turnActionBonus = 15;
+
+  const city = g.board.vertices.find(
+    (vertex) => vertex.owner === "p0" && !vertex.city,
+  )!;
+  grant(g, "p0", { wheat: 2, ore: 3 });
+  let deadline = Date.now() + 5_000;
+  g.deadline = deadline;
+  g = applyAction(g, "p0", { type: "city", id: city.id });
+  assert.equal(g.deadline, deadline + bonusMs);
+
+  grant(g, "p0", { wood: 1, brick: 1 });
+  deadline = g.deadline!;
+  g = applyAction(g, "p0", {
+    type: "road",
+    id: roadSites(g, g.players[0])[0],
+  });
+  assert.equal(g.deadline, deadline + bonusMs);
+
+  while (!settlementSites(g, g.players[0]).length) {
+    const extension = roadSites(g, g.players[0])[0];
+    assert.notEqual(extension, undefined);
+    g.board.edges[extension].owner = "p0";
+  }
+  grant(g, "p0", { wood: 1, brick: 1, sheep: 1, wheat: 1 });
+  deadline = g.deadline!;
+  g = applyAction(g, "p0", {
+    type: "settlement",
+    id: settlementSites(g, g.players[0])[0],
+  });
+  assert.equal(g.deadline, deadline + bonusMs);
+
+  g.turn = Math.max(1, g.turn);
+  g.players[0].playedDev = false;
+  g.players[0].dev.push({ type: "plenty", bought: g.turn - 1 });
+  deadline = g.deadline!;
+  g = applyAction(g, "p0", {
+    type: "dev",
+    card: "plenty",
+    resources: ["wood", "brick"],
+  });
+  assert.equal(g.deadline, deadline + bonusMs);
+
+  let knight = setup(fresh());
+  knight.phase = "main";
+  knight.turn = Math.max(1, knight.turn);
+  knight.options.turnActionBonus = 15;
+  knight.deadline = Date.now() + 5_000;
+  knight.players[0].dev = [{ type: "knight", bought: knight.turn - 1 }];
+  knight = applyAction(knight, "p0", { type: "dev", card: "knight" });
+  assert.equal(knight.phase, "robber");
+  assert.ok(knight.resumeTime! > 19_000);
+  assert.ok(knight.resumeTime! <= 20_000);
+  assert.ok(knight.deadline! <= Date.now() + 10_000);
+
+  let disabled = setup(fresh());
+  disabled.phase = "main";
+  disabled.options.turnActionBonus = 0;
+  const disabledCity = disabled.board.vertices.find(
+    (vertex) => vertex.owner === "p0" && !vertex.city,
+  )!;
+  grant(disabled, "p0", { wheat: 2, ore: 3 });
+  deadline = Date.now() + 5_000;
+  disabled.deadline = deadline;
+  disabled = applyAction(disabled, "p0", {
+    type: "city",
+    id: disabledCity.id,
+  });
+  assert.equal(disabled.deadline, deadline);
+});
 test("expired required actions choose random legal fallbacks", () => {
   const opening = fresh();
   const settlement = chooseTimeoutAction(opening, opening.players[0]);

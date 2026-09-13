@@ -500,6 +500,15 @@ const optionsSchema = z.object({
     z.literal(180),
     z.literal(360),
   ]),
+  turnActionBonus: z.union([
+    z.literal(0),
+    z.literal(5),
+    z.literal(10),
+    z.literal(15),
+    z.literal(20),
+    z.literal(30),
+    z.literal(60),
+  ]).default(15),
   setupSettlementTimer: z.union([
     z.literal(0),
     z.literal(5),

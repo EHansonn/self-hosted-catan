@@ -1419,6 +1419,20 @@ export function App() {
             <option value={360}>6 minutes</option>
           </LabelSelect>
           <LabelSelect
+            label="Time bonus after builds/cards"
+            value={room.options.turnActionBonus ?? DEFAULT_OPTIONS.turnActionBonus}
+            disabled={!host || pending}
+            onChange={(value) => updateRoomOptions({ turnActionBonus: Number(value) as Options["turnActionBonus"] })}
+          >
+            <option value={0}>Off</option>
+            <option value={5}>+5 seconds</option>
+            <option value={10}>+10 seconds</option>
+            <option value={15}>+15 seconds</option>
+            <option value={20}>+20 seconds</option>
+            <option value={30}>+30 seconds</option>
+            <option value={60}>+60 seconds</option>
+          </LabelSelect>
+          <LabelSelect
             label="Opening settlement timer"
             value={room.options.setupSettlementTimer ?? DEFAULT_OPTIONS.setupSettlementTimer}
             disabled={!host || pending}
@@ -2495,6 +2509,10 @@ export function App() {
                 {room.code} · {room.options.seats} seats · {room.options.target}{" "}
                 points ·{" "}
                 {room.options.timer ? `${room.options.timer}s turns` : "Untimed turns"}
+                {" · "}
+                {(room.options.turnActionBonus ?? DEFAULT_OPTIONS.turnActionBonus)
+                  ? `+${room.options.turnActionBonus ?? DEFAULT_OPTIONS.turnActionBonus}s after builds/cards`
+                  : "No action time bonus"}
                 {" · "}
                 {(room.options.setupSettlementTimer ?? DEFAULT_OPTIONS.setupSettlementTimer)
                   ? `${room.options.setupSettlementTimer ?? DEFAULT_OPTIONS.setupSettlementTimer}s opening settlements`
