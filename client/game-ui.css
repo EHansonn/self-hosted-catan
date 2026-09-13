@@ -52,10 +52,6 @@ button.game-card:disabled { opacity: .42; }
 .turn-clock.urgent { color: #a52920; background: linear-gradient(#fff0e8,#efb8a4); animation: clock-urgent .8s ease-in-out infinite alternate; }
 @keyframes clock-urgent { from { box-shadow: inset 0 0 0 2px #e55e3d33; } to { box-shadow: inset 0 0 0 3px #e55e3daa,0 0 10px #ffb08a55; } }
 .turn-banner > .avatar-badge { width: 32px; height: 32px; }.turn-banner > div > strong { font-size: 16px; font-weight: 500; color: #252525; line-height: 1.2; }.turn-banner .roll-btn { margin-left: auto; background: #ee8425; min-width: 105px; }.turn-banner > div:nth-child(2) { flex: 1; }
-.turn-banner .pause-game-btn { flex: 0 0 auto; min-width: 82px; min-height: 34px; padding: 5px 9px; gap: 5px; border-color: #7897a7; background: linear-gradient(#eef4f4,#d5e1e4); color: #274d60; box-shadow: 0 1px 0 #fff8; }
-.turn-banner .pause-game-btn:hover:not(:disabled) { border-color: #4788a8; background: #f7fbfc; color: #173f54; }
-.turn-banner .pause-game-btn.is-paused { border-color: #cc8e20; background: linear-gradient(#ffe495,#efbd4f); color: #5b3705; box-shadow: 0 0 0 2px #ffeab866; }
-.turn-banner .pause-game-btn.is-paused:hover:not(:disabled) { border-color: #b87810; background: #ffdf7c; color: #4b2c00; }
 .game-dice { position: absolute; bottom: 22px; right: 15px; display: flex; gap: 9px; pointer-events: none; z-index: 3; }
 .board-dice-cluster { position: absolute; right: 15px; bottom: 22px; z-index: 3; display: flex; align-items: center; gap: 9px; }
 .board-dice-cluster .game-dice { position: static; }
@@ -158,7 +154,6 @@ button.game-card:disabled { opacity: .42; }
 .dev-resource-choice { --card-width: 42px; display: grid; gap: 10px; padding: 12px; border: 1px solid #c7cfce; border-radius: 10px; background: #fffaf0; }.dev-resource-choice h3 { margin: 5px 0 0; font-size: 14px; font-weight: 700; }.dev-resource-choice .cards-row { gap: 12px; padding: 5px 2px; }.dev-resource-heading p { margin: 3px 0 0; color: #617785; font-size: 12px; line-height: 1.45; }.dev-resource-play { justify-self: end; min-width: 150px; }
 .rules-costs { --card-width: 27px; }.rules-costs .cards-row { flex-wrap: wrap; gap: 6px; }.rules-costs .card-count { font-size: 14px; min-width: 18px; line-height: 18px; height: 20px; }
 @media(max-width: 760px) { .turn-banner .roll-btn { flex: 0 0 auto; width: auto; min-height: 38px; }.in-game .turn-banner { flex-wrap: nowrap; }.discard-palette { --card-width: clamp(31px,10vw,47px); gap: 9px; }.discard-selection { --card-width: 36px; }.dev-resource-choice { --card-width: 37px; } }
-@media(max-width: 460px) { .turn-banner .pause-game-btn { min-width: 38px; width: 38px; padding: 5px; }.turn-banner .pause-game-btn span { display: none; } }
 @media(max-width: 760px) { .trade-composer { --card-width: 44px; }.trade-palette { gap: 4px; padding-inline: 6px; }.trade-line-label { display: block; flex: 0 0 38px; color: #34515e; font-size: 9px; font-weight: 800; line-height: 1.15; text-transform: uppercase; }.trade-line-empty { display: block; min-width: 0; overflow: hidden; color: #687b83; font-size: 11px; line-height: 1.2; white-space: nowrap; text-overflow: ellipsis; }.trade-status { width: 100%; } }
 @media(max-width: 380px) { .trade-bank-mark { display: none; } }
 @media(max-width: 760px) { .hand-development-cards { flex-basis: auto; width: auto; gap: 7px; } }
