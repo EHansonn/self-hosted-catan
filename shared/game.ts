@@ -1166,10 +1166,8 @@ function mutate(g: Game, id: string, a: Action) {
       return;
     }
     const from = g.players.find((x) => x.id === offer.from)!;
-    ensure(
-      canPay(p, offer.want) && canPay(from, offer.give),
-      "One of you no longer has those cards.",
-    );
+    ensure(canPay(p, offer.want), "You do not have the cards requested by this trade.");
+    ensure(canPay(from, offer.give), "The player offering this trade no longer has those cards.");
     if (!offer.to) {
       offer.rejected = offer.rejected.filter((playerId) => playerId !== id);
       if (!offer.approved.includes(id)) {

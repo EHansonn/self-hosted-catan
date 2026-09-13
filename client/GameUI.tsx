@@ -203,6 +203,10 @@ export function OfferPanel({ offer, players, me, enabled, act, onEdit }: { offer
   const mine = offer.from === me, recipient = players.find(p => p.id === me)!;
   const canRespond = !mine && (!offer.to || offer.to === me);
   const canPay = RESOURCES.every(r => (recipient.resources?.[r] || 0) >= offer.want[r]);
+  const missingCards = RESOURCES.flatMap(resource => {
+    const missing = offer.want[resource] - (recipient.resources?.[resource] || 0);
+    return missing > 0 ? [`${missing} ${resourceNames[resource]}`] : [];
+  });
   const broadcast = !offer.to;
   const approvedByMe = offer.approved.includes(me);
   const responders = players.filter(p => p.id !== offer.from && (!offer.to || p.id === offer.to));
@@ -220,10 +224,11 @@ export function OfferPanel({ offer, players, me, enabled, act, onEdit }: { offer
       <div className="trade-line giving"><Sprite name="people" /><ArrowUp className="trade-arrow" /><CardRow hand={offer.want} label="Requested resources" /></div>
       {mine && broadcast && <p className="offer-guidance">{offer.approved.length ? "Choose who to trade with by clicking their green checkmark." : "Waiting for players to approve your offer."}</p>}
       {!mine && broadcast && approvedByMe && <p className="offer-guidance">Approved — waiting for {from.name} to choose.</p>}
+      {canRespond && !canPay && <p className="offer-guidance offer-unavailable">You cannot accept this trade. You are missing {missingCards.join(", ")}.</p>}
       <div className="offer-actions">
         {(mine || canRespond) && <ActionTile label={mine ? "Edit offer" : "Edit counteroffer"} disabled={!enabled} onClick={onEdit}><Pencil /></ActionTile>}
         {(mine || canRespond) && <ActionTile label={mine ? "Cancel offer" : "Reject offer"} disabled={!enabled} onClick={() => act(mine ? { type: "cancelTrade" } : { type: "reject", offerId: offer.id })}><X /></ActionTile>}
-        {canRespond && <ActionTile label={broadcast ? approvedByMe ? "Offer approved" : "Approve offer" : "Accept counteroffer"} disabled={!enabled || !canPay || (broadcast && approvedByMe)} onClick={() => act({ type: "accept", offerId: offer.id })}><Check /></ActionTile>}
+        {canRespond && <ActionTile label={!canPay ? `Cannot accept; missing ${missingCards.join(", ")}` : broadcast ? approvedByMe ? "Offer approved" : "Approve offer" : "Accept counteroffer"} disabled={!enabled || !canPay || (broadcast && approvedByMe)} onClick={() => act({ type: "accept", offerId: offer.id })}><Check /></ActionTile>}
       </div>
     </div>
   </section>;

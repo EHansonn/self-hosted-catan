@@ -440,6 +440,10 @@ test("counteroffers preserve active-player trading, ownership and stale-offer sa
 test("trade creators choose among approving players before cards move", () => {
   let g = setup(fresh());
   g.phase = "main";
+  RESOURCES.forEach((resource) => {
+    g.bank[resource] += g.players[3].resources[resource];
+    g.players[3].resources[resource] = 0;
+  });
   grant(g, "p0", { wood: 1 });
   grant(g, "p1", { ore: 1 });
   grant(g, "p2", { ore: 1 });
@@ -454,6 +458,13 @@ test("trade creators choose among approving players before cards move", () => {
     () => applyAction(g, "p0", { type: "accept", offerId }),
     /approved/,
   );
+  const beforeInvalidApproval = structuredClone(g.players.map((player) => player.resources));
+  assert.throws(
+    () => applyAction(g, "p3", { type: "accept", offerId }),
+    /do not have the cards requested/,
+  );
+  assert.deepEqual(g.offer!.approved, []);
+  assert.deepEqual(g.players.map((player) => player.resources), beforeInvalidApproval);
   g = applyAction(g, "p1", { type: "accept", offerId });
   g = applyAction(g, "p2", { type: "accept", offerId });
   assert.deepEqual(g.offer!.approved, ["p1", "p2"]);
@@ -468,9 +479,19 @@ test("trade creators choose among approving players before cards move", () => {
         type: "accept",
         offerId,
         player: "p3",
-      }),
+    }),
     /approved/,
   );
+  const approvedPlayerOre = g.players[2].resources.ore;
+  g.bank.ore += approvedPlayerOre;
+  g.players[2].resources.ore = 0;
+  assert.throws(
+    () => applyAction(g, "p0", { type: "accept", offerId, player: "p2" }),
+    /no longer has those cards/,
+  );
+  assert.ok(g.offer, "an unaffordable trade must remain unsettled");
+  g.players[2].resources.ore = approvedPlayerOre;
+  g.bank.ore -= approvedPlayerOre;
   g = applyAction(g, "p0", { type: "accept", offerId, player: "p2" });
   assert.equal(g.offer, null);
   assert.deepEqual(g.players[1].resources, beforeApproval[1]);

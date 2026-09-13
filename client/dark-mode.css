@@ -336,6 +336,10 @@ html[data-color-theme="dark"] .offer-guidance {
   color: #bfd2dc;
 }
 
+html[data-color-theme="dark"] .offer-guidance.offer-unavailable {
+  color: #ffac9d;
+}
+
 html[data-color-theme="dark"] .game-dialog {
   border-color: #40586a !important;
   background: #132631 !important;
