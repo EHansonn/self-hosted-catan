@@ -167,6 +167,15 @@ export function TradeComposer({ open, onClose, game, me, hand, give, want, setGi
       <DialogTitle className="sr-only">{counterId === null ? "Make a trade" : "Counteroffer"}</DialogTitle>
       <DialogDescription className="sr-only">Select cards to offer from your hand and cards to request from the bank. Click a selected card to remove it, then submit the trade to the bank or players.</DialogDescription>
       <div className="trade-composer">
+        <div className="trade-sheet-heading">
+          <span>
+            <strong>{counterId === null ? "Make a trade" : "Counteroffer"}</strong>
+            <small>Choose cards to give and receive</small>
+          </span>
+          <button type="button" aria-label="Close trade editor" onClick={onClose}>
+            <X />
+          </button>
+        </div>
         <div className="trade-palette cream-tray" aria-label="Choose resources to receive">
           <span className="trade-palette-label">Request</span>
           {RESOURCES.map(r => <GameCard key={r} resource={r} label={`Request ${resourceNames[r]}`} disabled={give[r] > 0 || want[r] >= 19} onClick={() => setWant({ ...want, [r]: want[r] + 1 })} />)}
