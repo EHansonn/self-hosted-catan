@@ -280,6 +280,60 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
       players.find((p) => p.id === id)?.color || "#fff";
     const material = (color: string, extra = {}) =>
       new THREE.MeshStandardMaterial({ color, roughness: 0.8, ...extra });
+    const terrainTexture = (
+      terrain: keyof typeof TERRAIN,
+    ): THREE.CanvasTexture => {
+      const cached = s.textures.get(terrain);
+      if (cached) return cached as THREE.CanvasTexture;
+
+      // Match the bright 2D board treatment: vivid terrain color first, then
+      // enough of the painted atlas to retain its natural detail.
+      const canvas = document.createElement("canvas");
+      canvas.width = 512;
+      canvas.height = 512;
+      const ctx = canvas.getContext("2d")!;
+      const tex = TERRAIN[terrain];
+      const paintBase = () => {
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = tex.color;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      };
+      paintBase();
+      const map = new THREE.CanvasTexture(canvas);
+      map.colorSpace = THREE.SRGBColorSpace;
+      map.anisotropy = Math.min(
+        4,
+        s.renderer.capabilities.getMaxAnisotropy(),
+      );
+      s.textures.set(terrain, map);
+
+      const image = new Image();
+      image.onload = () => {
+        const cellWidth = image.naturalWidth / 3;
+        const cellHeight = image.naturalHeight / 2;
+        paintBase();
+        ctx.globalAlpha = 0.28;
+        ctx.drawImage(
+          image,
+          tex.col * cellWidth,
+          tex.row * cellHeight,
+          cellWidth,
+          cellHeight,
+          0,
+          0,
+          canvas.width,
+          canvas.height,
+        );
+        ctx.globalAlpha = 0.08;
+        ctx.fillStyle = "#ffe39c";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.globalAlpha = 1;
+        map.needsUpdate = true;
+        s.dirty = true;
+      };
+      image.src = "/textures/terrain-atlas.png";
+      return map;
+    };
     const add = (
       geometry: THREE.BufferGeometry,
       mat: THREE.Material | THREE.Material[],
@@ -755,22 +809,7 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
     );
     sea.receiveShadow = true;
     for (const tile of board.tiles) {
-      const tex = TERRAIN[tile.terrain];
-      let map = s.textures.get(tile.terrain);
-      if (!map) {
-        map = new THREE.TextureLoader().load(
-          "/textures/terrain-atlas.png",
-          () => (s.dirty = true),
-        );
-        map.colorSpace = THREE.SRGBColorSpace;
-        map.repeat.set(1 / 3, 1 / 2);
-        map.offset.set(tex.col / 3, (1 - tex.row) / 2);
-        map.anisotropy = Math.min(
-          4,
-          s.renderer.capabilities.getMaxAnisotropy(),
-        );
-        s.textures.set(tile.terrain, map);
-      }
+      const map = terrainTexture(tile.terrain);
       add(
         new THREE.CylinderGeometry(0.99, 0.99, 0.27, 6),
         material("#bb9965"),
@@ -796,7 +835,10 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
         material("#ffffff", {
           map,
           bumpMap: map,
-          bumpScale: 0.065,
+          bumpScale: 0.04,
+          emissive: "#ffffff",
+          emissiveMap: map,
+          emissiveIntensity: 0.08,
           side: THREE.DoubleSide,
         }),
         tile.x,

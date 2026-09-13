@@ -63,12 +63,12 @@ export const TERRAIN: Record<
   Resource | "desert",
   { col: number; row: number; color: string; label: string }
 > = {
-  wood: { col: 0, row: 0, color: "#376e46", label: "Wood" },
-  wheat: { col: 1, row: 0, color: "#e2b04b", label: "Wheat" },
-  ore: { col: 2, row: 0, color: "#899497", label: "Ore" },
-  sheep: { col: 0, row: 1, color: "#a2bd62", label: "Sheep" },
-  brick: { col: 1, row: 1, color: "#bd6e4a", label: "Brick" },
-  desert: { col: 2, row: 1, color: "#dfc082", label: "Desert" },
+  wood: { col: 0, row: 0, color: "#0bb038", label: "Wood" },
+  wheat: { col: 1, row: 0, color: "#f6bf16", label: "Wheat" },
+  ore: { col: 2, row: 0, color: "#a3b1af", label: "Ore" },
+  sheep: { col: 0, row: 1, color: "#9cc614", label: "Sheep" },
+  brick: { col: 1, row: 1, color: "#eb6c28", label: "Brick" },
+  desert: { col: 2, row: 1, color: "#d8c780", label: "Desert" },
 };
 // Font-independent number shapes keep the production tokens readable in iOS
 // Safari versions that intermittently omit SVG <text> while still painting the
@@ -592,7 +592,7 @@ function Board2D({
             </defs>
             <polygon
               points={poly}
-              fill={{ wood: "#0bb038", brick: "#eb6c28", sheep: "#9cc614", wheat: "#f6bf16", ore: "#a3b1af", desert: "#d8c780" }[tile.terrain]}
+              fill={tex.color}
               stroke="#f8d078"
               strokeWidth=".09"
             />
