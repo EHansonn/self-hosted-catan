@@ -31,7 +31,7 @@ button.game-card:disabled { opacity: .42; }
 .action-tile:disabled { opacity: 1; cursor: default; }.action-tile:disabled > * { opacity: .37; }
 .action-tile:hover:not(:disabled) { filter: brightness(1.09); transform: translateY(-2px); }.action-tile:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 1px 0 #899ecb; }.action-tile.selected { background: linear-gradient(#e6b644,#fff3ac); }
 .action-tile.end-turn-prompt { animation: end-turn-prompt-pulse 1.05s ease-in-out infinite alternate; }
-@keyframes end-turn-prompt-pulse { from { filter: brightness(1); box-shadow: 0 4px 0 #899ecb,inset 0 0 0 1px #d9f5ff70,0 0 0 0 #fff2a000; } to { filter: brightness(1.13); box-shadow: 0 4px 0 #899ecb,inset 0 0 0 1px #fff9cf,0 0 0 4px #fff2a0aa,0 0 18px #ffe067aa; } }
+@keyframes end-turn-prompt-pulse { from { transform: scale(.96); filter: brightness(1); border-color: #fff; box-shadow: 0 4px 0 #899ecb,inset 0 0 0 1px #d9f5ff70,0 0 0 0 #ffd84a00; } to { transform: scale(1.055); filter: brightness(1.16); border-color: #fff2a0; box-shadow: 0 4px 0 #899ecb,inset 0 0 0 2px #fff8c9,0 0 0 5px #ffd84ab8,0 0 24px #ffd84acc; } }
 .action-tile .action-count { position: absolute; top: 0; right: 0; padding: 1px 5px 3px 9px; border-radius: 1px 6px 1px 16px; background: #334250; color: white; font-size: 20px; line-height: 23px; text-shadow: 0 1px 1px #222; }
 .action-tile .game-card { --card-width: 36px; pointer-events: none; }.action-tile .tile-check { position: absolute; right: 7px; top: 5px; width: 20%; height: 20%; }
 .game-tooltip { background: #454748; color: white; font-size: 14px; max-width: 230px; padding: 9px 12px; text-align: center; }
