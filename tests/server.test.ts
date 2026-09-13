@@ -256,6 +256,15 @@ test("packaged server: guest joins, creator-only rooms, scaled tables, privacy, 
     );
     assert.equal(host.state!.players[0].color, COLORS[5]);
     const code = host.state!.code;
+    const duplicateName = await clients[1].cmd({
+      type: "join",
+      name: " hOsT ",
+      code,
+    });
+    assert.equal(duplicateName.ok, false);
+    assert.match(duplicateName.error || "", /already being used/);
+    await host.cmd({ type: "sync" });
+    assert.equal(host.state!.players.length, 1);
     for (let i = 1; i < 6; i++)
       assert.ok(
         (

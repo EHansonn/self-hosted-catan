@@ -659,13 +659,27 @@ function unusedColor(room: Room, requested?: string) {
     COLORS[room.players.length % COLORS.length]
   );
 }
+function playerNameKey(name: string) {
+  return name
+    .normalize("NFKC")
+    .replace(/\s+/gu, " ")
+    .toLocaleLowerCase("en-US");
+}
+function ensurePlayerNameAvailable(room: Room, name: string) {
+  if (
+    room.players.some(
+      (player) => playerNameKey(player.name) === playerNameKey(name),
+    )
+  )
+    fail("That name is already being used in this room.");
+}
 function randomBotName(room: Room) {
-  const used = new Set(room.players.map((player) => player.name.toLowerCase()));
-  const available = BOT_NAMES.filter((name) => !used.has(name.toLowerCase()));
+  const used = new Set(room.players.map((player) => playerNameKey(player.name)));
+  const available = BOT_NAMES.filter((name) => !used.has(playerNameKey(name)));
   if (available.length) return available[randomInt(available.length)];
   let fallback = "";
   do fallback = `Bot ${randomInt(100, 1000)}`;
-  while (used.has(fallback.toLowerCase()));
+  while (used.has(playerNameKey(fallback)));
   return fallback;
 }
 function isViewingRoom(code: string, playerId: string) {
@@ -1091,8 +1105,9 @@ io.on("connection", (socket) => {
           if (savedRoom && canResumeRoom(savedRoom.game))
             fail("Leave your current room before joining another.");
           if (r.players.length >= r.options.seats) fail("This room is full.");
-          releaseFinishedRoom(session, savedRoom);
           name = playerName.parse(command.name);
+          ensurePlayerNameAvailable(r, name);
+          releaseFinishedRoom(session, savedRoom);
         }
         const player = makePlayer(session.id, name, r.players.length);
         player.color = unusedColor(r, requestedColor);
