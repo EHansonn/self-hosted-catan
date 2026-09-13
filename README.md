@@ -22,7 +22,16 @@ depending on a hosted browser service.
 
 ### Mobile
 
-![Crossroads home and in-progress game views shown inside phone frames](docs/screenshots/mobile.png)
+![A Crossroads game in progress inside a simple iPhone frame](docs/screenshots/mobile.png)
+
+Refresh every README screenshot from deterministic local game states:
+
+```sh
+npm run screenshots
+```
+
+The first run may ask you to install the screenshot browser with
+`npx playwright install chromium`.
 
 ## Commands
 
