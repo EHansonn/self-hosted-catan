@@ -2419,10 +2419,9 @@ export function App() {
           onEscapeKeyDown={(e) => e.preventDefault()}
           onPointerDownOutside={(e) => e.preventDefault()}
         >
-          <DialogTitle>The robber is coming</DialogTitle>
+          <DialogTitle>Discard cards</DialogTitle>
           <DialogDescription>
-            You have more than seven cards. Choose{" "}
-            {game?.discards[room?.me || ""]} to return to the bank.
+            Select {game?.discards[room?.me || ""]} cards to return to the bank.
           </DialogDescription>
           <CardPicker
             value={discard}
