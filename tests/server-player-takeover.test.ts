@@ -141,7 +141,7 @@ test("disconnected seats get temporary help and hosts can permanently replace a 
 
     const returned = await connect(guestCookie);
     assert.ok(
-      (await returned.command({ type: "resume", code, name: "Guest" })).ok,
+      (await returned.command({ type: "resume", code })).ok,
     );
     await waitFor(
       () =>
@@ -193,7 +193,7 @@ test("disconnected seats get temporary help and hosts can permanently replace a 
     );
     await waitFor(() => returned.state === null);
     assert.equal(
-      (await returned.command({ type: "resume", code, name: "Guest" })).ok,
+      (await returned.command({ type: "resume", code })).ok,
       false,
     );
   } finally {

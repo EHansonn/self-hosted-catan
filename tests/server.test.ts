@@ -345,11 +345,7 @@ test("packaged server: guest joins, creator-only rooms, scaled tables, privacy, 
     assert.equal(freshTab.resumable[0].code, code);
     await host.cmd({ type: "sync" });
     assert.equal(freshTab.state, null);
-    assert.equal(
-      (await freshTab.cmd({ type: "resume", code, name: "Someone else" })).ok,
-      false,
-    );
-    assert.ok((await freshTab.cmd({ type: "resume", code, name: "host" })).ok);
+    assert.ok((await freshTab.cmd({ type: "resume", code })).ok);
     assert.equal(freshTab.state!.code, code);
     assert.ok((await freshTab.cmd({ type: "home" })).ok);
     assert.equal(freshTab.state, null);
@@ -571,9 +567,7 @@ test("packaged server: guest joins, creator-only rooms, scaled tables, privacy, 
     const reconnected = await connect(cookies[2]);
     assert.equal(reconnected.state, null);
     assert.equal(reconnected.resumable[0].code, code);
-    assert.ok(
-      (await reconnected.cmd({ type: "resume", code, name: "Guest 2" })).ok,
-    );
+    assert.ok((await reconnected.cmd({ type: "resume", code })).ok);
     assert.equal(reconnected.state!.me, privateId);
     assert.equal(reconnected.state!.game!.version, paused);
     const before = host.state!.game!;
@@ -618,7 +612,7 @@ test("packaged server: guest joins, creator-only rooms, scaled tables, privacy, 
     assert.equal(finishedHome.state, null);
     assert.deepEqual(finishedHome.resumable, []);
     assert.equal(
-      (await finishedHome.cmd({ type: "resume", code, name: "Host" })).ok,
+      (await finishedHome.cmd({ type: "resume", code })).ok,
       false,
     );
     assert.ok(
@@ -640,7 +634,7 @@ test("packaged server: guest joins, creator-only rooms, scaled tables, privacy, 
     const restored = await connect(cookies[0]);
     assert.equal(restored.state, null);
     assert.equal(restored.resumable[0].code, code);
-    assert.ok((await restored.cmd({ type: "resume", code, name: "Host" })).ok);
+    assert.ok((await restored.cmd({ type: "resume", code })).ok);
     assert.equal(restored.state!.code, code);
     assert.equal(restored.state!.mapSeed, selectedMapSeed);
     assert.equal(restored.state!.game!.version, before.version);

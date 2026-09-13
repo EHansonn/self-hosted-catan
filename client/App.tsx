@@ -277,7 +277,6 @@ export function App() {
     [gameResults, setGameResults] = useState<GameResults | null>(null),
     [pending, setPending] = useState(false);
   const [name, setName] = useState(""),
-    [resumeName, setResumeName] = useState(""),
     [creationPassword, setCreationPassword] = useState(""),
     [code, setCode] = useState(
       () => new URLSearchParams(location.search).get("room") || "",
@@ -561,13 +560,6 @@ export function App() {
         ? {
             type: active.spectator ? "spectate" : "resume",
             code: active.code,
-            ...(active.spectator
-              ? {}
-              : {
-                  name: active.players.find(
-                    (player) => player.id === active.me,
-                  )?.name,
-                }),
           }
         : { type: "home" };
       s.emit(
@@ -726,10 +718,7 @@ export function App() {
     }
   };
   const resumeGame = async (roomCode: string) => {
-    if (
-      await command({ type: "resume", code: roomCode, name: resumeName })
-    )
-      setResumeName("");
+    await command({ type: "resume", code: roomCode });
   };
   const goHome = async () => {
     if (!(await command({ type: "home" }))) return false;
@@ -1780,22 +1769,10 @@ export function App() {
                       </small>
                     </span>
                     <span className="resume-controls">
-                      <label className="resume-name">
-                        <span>Your name</span>
-                        <input
-                          aria-label={`Your name for room ${saved.code}`}
-                          value={resumeName}
-                          onChange={(event) => setResumeName(event.target.value)}
-                          required
-                          maxLength={20}
-                          autoComplete="off"
-                          placeholder="Enter your name"
-                        />
-                      </label>
                       <button
                         type="submit"
                         className="resume-action"
-                        disabled={pending || !connected || !resumeName.trim()}
+                        disabled={pending || !connected}
                       >
                         <Play size={16} /> Reconnect
                       </button>

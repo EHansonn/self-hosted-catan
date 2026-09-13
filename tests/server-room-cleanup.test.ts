@@ -104,7 +104,6 @@ test("empty started games close after a restart-safe grace period", async () => 
         await client.command({
           type: "resume",
           code: firstCode,
-          name: "Human",
         })
       ).ok,
     );
