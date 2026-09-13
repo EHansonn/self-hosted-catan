@@ -921,37 +921,68 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
         top.userData.pick = tile.id;
         const selected = props.selected === tile.id;
         const shadow = add(
-          new THREE.CircleGeometry(selected ? 0.19 : 0.16, 32),
+          new THREE.RingGeometry(
+            selected ? 0.38 : 0.4,
+            selected ? 0.59 : 0.56,
+            48,
+          ),
           new THREE.MeshBasicMaterial({
             color: "#173744",
             transparent: true,
-            opacity: 0.38,
+            opacity: 0.48,
             side: THREE.DoubleSide,
+            depthWrite: false,
           }),
           tile.x,
-          0.175,
-          tile.y + 0.025,
+          0.253,
+          tile.y + 0.035,
         );
         shadow.rotation.x = -Math.PI / 2;
+        shadow.renderOrder = 18;
         const marker = add(
-          new THREE.CylinderGeometry(selected ? 0.16 : 0.135, selected ? 0.16 : 0.135, 0.045, 32),
-          material(selected ? "#fff39a" : "#cddd63", {
-            emissive: selected ? "#d9aa24" : "#687b22",
-            emissiveIntensity: selected ? 0.72 : 0.34,
+          new THREE.RingGeometry(
+            selected ? 0.37 : 0.39,
+            selected ? 0.54 : 0.51,
+            48,
+          ),
+          new THREE.MeshBasicMaterial({
+            color: selected ? "#fff39a" : "#ddeb75",
+            transparent: true,
+            opacity: selected ? 1 : 0.94,
+            side: THREE.DoubleSide,
+            depthTest: false,
+            depthWrite: false,
+            toneMapped: false,
           }),
           tile.x,
-          0.205,
+          0.27,
           tile.y,
         );
+        marker.rotation.x = -Math.PI / 2;
+        marker.renderOrder = 20;
         marker.userData.pick = tile.id;
         const markerRim = add(
-          new THREE.RingGeometry(selected ? 0.15 : 0.125, selected ? 0.19 : 0.16, 32),
-          new THREE.MeshBasicMaterial({ color: "#ffffff", side: THREE.DoubleSide }),
+          new THREE.RingGeometry(
+            selected ? 0.53 : 0.5,
+            selected ? 0.59 : 0.56,
+            48,
+          ),
+          new THREE.MeshBasicMaterial({
+            color: "#ffffff",
+            transparent: true,
+            opacity: selected ? 1 : 0.9,
+            side: THREE.DoubleSide,
+            depthTest: false,
+            depthWrite: false,
+            toneMapped: false,
+          }),
           tile.x,
-          0.231,
+          0.272,
           tile.y,
         );
         markerRim.rotation.x = -Math.PI / 2;
+        markerRim.renderOrder = 21;
+        markerRim.userData.pick = tile.id;
       }
       if (tile.number) numberToken(tile.number, tile.x, tile.y);
       if (tile.id === robber) {

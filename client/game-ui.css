@@ -177,9 +177,9 @@ button.game-card:disabled { opacity: .42; }
 .tile-place-marker { pointer-events: none; filter: drop-shadow(0 .05px .04px #123a46); animation: tile-choice-pulse 1.25s ease-in-out infinite alternate; }
 .tile-place-marker.selected { filter: drop-shadow(0 0 .12px #fff) drop-shadow(0 0 .16px #ffd553); }
 .port-badge-2d { pointer-events: none; }
-.three-pick-target.tile-target { width: 44px; height: 44px; margin: 0; border: 0; border-radius: 50%; background: transparent; box-shadow: none; opacity: 1; }
-.three-pick-target.tile-target:hover,.three-pick-target.tile-target:focus-visible { background: #fff08a25; box-shadow: 0 0 0 4px #fff08a88; }
-.three-pick-target.tile-target.selected { width: 44px; height: 44px; margin: 0; background: transparent; box-shadow: 0 0 0 3px #ffd64daa; }
+.three-pick-target.tile-target { width: 58px; height: 58px; margin: 0; border: 0; border-radius: 50%; background: transparent; box-shadow: none; opacity: 1; }
+.three-pick-target.tile-target:hover,.three-pick-target.tile-target:focus-visible { background: #fff08a1f; box-shadow: 0 0 0 5px #fff08a99; }
+.three-pick-target.tile-target.selected { width: 58px; height: 58px; margin: 0; background: #fff08a16; box-shadow: 0 0 0 4px #ffd64dcc,0 0 16px #fff08aaa; }
 @keyframes tile-choice-pulse { from { opacity: .76; } to { opacity: 1; } }
 .trade-status { width: fit-content; border-radius: 3px; padding: 2px 5px; background: #0d68a1ef; }
 .action-tile > svg { fill: none; stroke: white; stroke-width: 3; filter: drop-shadow(1px 1px 0 #25424f) drop-shadow(-1px -1px 0 #25424f); }
