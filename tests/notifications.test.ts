@@ -4,6 +4,7 @@ import type { GameView } from "../shared/game";
 import {
   getTurnAttention,
   playTurnNotification,
+  shouldBringOwnTurnIntoView,
 } from "../client/turnNotifications";
 
 const game = (changes: Partial<GameView> = {}) =>
@@ -108,6 +109,18 @@ test("special build attention is named explicitly", () => {
       false,
     )?.label,
     "Your special build phase",
+  );
+});
+
+test("mobile turn focus only follows the player's normal turn", () => {
+  assert.equal(shouldBringOwnTurnIntoView(game(), "me"), true);
+  assert.equal(
+    shouldBringOwnTurnIntoView(game({ current: 1 }), "me"),
+    false,
+  );
+  assert.equal(
+    shouldBringOwnTurnIntoView(game({ secondary: true }), "me"),
+    false,
   );
 });
 

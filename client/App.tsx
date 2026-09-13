@@ -74,6 +74,7 @@ import { ActionTile, Avatar, CardRow, DevelopmentCard, Dice, EndTurnIcon, GameCa
 import {
   getTurnAttention,
   playTurnNotification,
+  shouldBringOwnTurnIntoView,
 } from "./turnNotifications";
 import { hasRemainingTurnAction } from "./turnActions";
 import { orderPlayersForViewer } from "./playerOrder";
@@ -852,6 +853,10 @@ export function App() {
   }, [game, kind, build]);
   const current = game?.players[game.current];
   const currentPlayerCard = useRef<HTMLDivElement | null>(null);
+  const bringOwnTurnIntoView = shouldBringOwnTurnIntoView(
+    game || null,
+    room?.me,
+  );
   const rosterPlayers = useMemo(
     () =>
       room
@@ -862,7 +867,7 @@ export function App() {
     [game, room],
   );
   useEffect(() => {
-    if (!current?.id || !currentPlayerCard.current) return;
+    if (!bringOwnTurnIntoView || !currentPlayerCard.current) return;
     if (!window.matchMedia("(max-width: 760px)").matches) return;
     currentPlayerCard.current.scrollIntoView({
       behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
@@ -871,7 +876,7 @@ export function App() {
       block: "nearest",
       inline: "center",
     });
-  }, [current?.id]);
+  }, [bringOwnTurnIntoView, current?.id]);
   const gameLogGroups = useMemo(
     () => (game ? groupGameLog(game.log) : []),
     [game],

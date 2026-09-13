@@ -5,6 +5,18 @@ export type TurnAttention = {
   label: string;
 };
 
+export function shouldBringOwnTurnIntoView(
+  game: GameView | null,
+  playerId: string | undefined,
+) {
+  return !!(
+    game &&
+    playerId &&
+    !game.secondary &&
+    game.players[game.current]?.id === playerId
+  );
+}
+
 export function getTurnAttention(
   game: GameView | null,
   roomCode: string | undefined,
