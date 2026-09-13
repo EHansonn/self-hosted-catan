@@ -406,6 +406,16 @@ html[data-color-theme="dark"] .trade-arrow {
   stroke: #c5d6df;
 }
 
+html[data-color-theme="dark"] .trade-palette-label,
+html[data-color-theme="dark"] .trade-line-label {
+  color: #c3d2da;
+}
+
+html[data-color-theme="dark"] .trade-hand-empty,
+html[data-color-theme="dark"] .trade-line-empty {
+  color: #9fb1bc;
+}
+
 html[data-color-theme="dark"] .discard-selection {
   border-color: #455d6c;
 }

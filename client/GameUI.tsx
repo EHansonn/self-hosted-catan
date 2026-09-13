@@ -153,6 +153,9 @@ export function TradeComposer({ open, onClose, game, me, hand, give, want, setGi
           ? "The bank is short of one or more requested cards"
           : "Choose different resources to give and receive";
   const counterValid = counterId === null || game.offer?.id === counterId;
+  const availableHand = Object.fromEntries(
+    RESOURCES.map(resource => [resource, Math.max(0, hand[resource] - give[resource])]),
+  ) as Hand;
   const submit = async (bank: boolean) => {
     if (!enabled || !valid || (bank ? !bankValid : !counterValid || game.secondary)) return;
     const action: Action = bank ? { type: "bank", give, want }
@@ -162,22 +165,35 @@ export function TradeComposer({ open, onClose, game, me, hand, give, want, setGi
   return <Dialog open={open} modal={false} onOpenChange={v => !v && onClose()}>
     <DialogContent className="trade-dialog" showCloseButton={false} onInteractOutside={e => e.preventDefault()}>
       <DialogTitle className="sr-only">{counterId === null ? "Make a trade" : "Counteroffer"}</DialogTitle>
-      <DialogDescription className="sr-only">Select cards from the top to request, and from your main hand below the trade window to offer. Click a selected card to remove it. Submit to the bank or players.</DialogDescription>
+      <DialogDescription className="sr-only">Select cards to offer from your hand and cards to request from the bank. Click a selected card to remove it, then submit the trade to the bank or players.</DialogDescription>
       <div className="trade-composer">
         <div className="trade-palette cream-tray" aria-label="Choose resources to receive">
+          <span className="trade-palette-label">Request</span>
           {RESOURCES.map(r => <GameCard key={r} resource={r} label={`Request ${resourceNames[r]}`} disabled={give[r] > 0 || want[r] >= 19} onClick={() => setWant({ ...want, [r]: want[r] + 1 })} />)}
           <span className="trade-bank-mark" title="Bank rates depend on your harbors"><Sprite name="bank" /></span>
         </div>
+        <div className="trade-hand-palette cream-tray" aria-label="Choose resources from your hand to offer">
+          <span className="trade-palette-label">Your cards</span>
+          <CardRow
+            hand={availableHand}
+            label="Your available cards; tap a card to offer it"
+            onSelect={resource => {
+              if (!enabled || want[resource] || give[resource] >= hand[resource]) return;
+              setGive({ ...give, [resource]: give[resource] + 1 });
+            }}
+          />
+          {!total(availableHand) && <span className="trade-hand-empty">All available cards are selected</span>}
+        </div>
         <div className="trade-selection cream-tray">
-          <div className="trade-line receiving"><Sprite name="people" /><ArrowDown className="trade-arrow" /><CardRow hand={want} label="You receive" onRemove={r => setWant({ ...want, [r]: want[r] - 1 })} /></div>
-          <div className="trade-line giving"><Avatar player={me} /><ArrowUp className="trade-arrow" /><CardRow hand={give} label="You give" onRemove={r => setGive({ ...give, [r]: give[r] - 1 })} /></div>
+          <div className="trade-line receiving"><Sprite name="people" /><ArrowDown className="trade-arrow" /><span className="trade-line-label">You get</span><CardRow hand={want} label="You receive" onRemove={r => setWant({ ...want, [r]: want[r] - 1 })} />{!total(want) && <span className="trade-line-empty">Tap a request card</span>}</div>
+          <div className="trade-line giving"><Avatar player={me} /><ArrowUp className="trade-arrow" /><span className="trade-line-label">You give</span><CardRow hand={give} label="You give" onRemove={r => setGive({ ...give, [r]: give[r] - 1 })} />{!total(give) && <span className="trade-line-empty">Tap one of your cards</span>}</div>
         </div>
         <div className="trade-rail">
-          <ActionTile label={bankLabel} disabled={!enabled || !bankValid} onClick={() => submit(true)}><Sprite name="bank" /><Check className="tile-check" /></ActionTile>
-          <ActionTile label={counterId !== null ? "Send counteroffer" : game.secondary ? "Player trades unavailable during paired turns" : "Offer to players"} disabled={!enabled || !valid || !counterValid || game.secondary} onClick={() => submit(false)}><Sprite name="people" /><Check className="tile-check" /></ActionTile>
-          <ActionTile label="Cancel trade" onClick={onClose}><X /></ActionTile>
+          <ActionTile label={bankLabel} disabled={!enabled || !bankValid} onClick={() => submit(true)}><Sprite name="bank" /><Check className="tile-check" /><span className="trade-action-copy">Bank</span></ActionTile>
+          <ActionTile label={counterId !== null ? "Send counteroffer" : game.secondary ? "Player trades unavailable during paired turns" : "Offer to players"} disabled={!enabled || !valid || !counterValid || game.secondary} onClick={() => submit(false)}><Sprite name="people" /><Check className="tile-check" /><span className="trade-action-copy">{counterId !== null ? "Counter" : "Players"}</span></ActionTile>
+          <ActionTile label="Cancel trade" onClick={onClose}><X /><span className="trade-action-copy">Cancel</span></ActionTile>
         </div>
-        <p className="trade-status" aria-live="polite">{!counterValid ? "This offer has changed. Close and reopen it." : total(give) || total(want) ? `${total(give)} offered · ${total(want)} requested${giving.length === 1 ? ` · bank rate ${game.legal.ratios[giving[0]]}:1` : bankUnits !== null ? ` · bank value ${bankUnits}` : ""}` : "Top: request cards · Your hand: offer cards"}</p>
+        <p className="trade-status" aria-live="polite">{!counterValid ? "This offer has changed. Close and reopen it." : total(give) || total(want) ? `${total(give)} offered · ${total(want)} requested${giving.length === 1 ? ` · bank rate ${game.legal.ratios[giving[0]]}:1` : bankUnits !== null ? ` · bank value ${bankUnits}` : ""}` : "Choose cards to offer and request"}</p>
       </div>
     </DialogContent>
   </Dialog>;
