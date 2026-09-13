@@ -18,6 +18,7 @@ import {
   type Options,
   type Player,
   type Action,
+  type Hand,
   type RoomView,
   type ResumeRoomView,
   DEFAULT_OPTIONS,
@@ -39,6 +40,8 @@ import {
   resetDeadline,
   expirePlayerTrade,
   canResumeRoom,
+  canPay,
+  total,
 } from "../shared/game";
 import { chooseBotAction, chooseTimeoutAction } from "../shared/bot";
 import {
@@ -154,6 +157,7 @@ interface Room {
   recordedMatchId?: string;
   leaderboardEligible?: boolean;
   startingHumanPlayers?: number;
+  discardSelections?: Record<string, Hand>;
 }
 const sessions = new Map<string, Session>(),
   rooms = new Map<string, Room>(),
@@ -898,6 +902,9 @@ function broadcast(room: Room) {
       players: ps.map((p) => publicPlayer(room.game, p, viewer)),
       game: room.game ? viewGame(room.game, viewer) : null,
       chat: room.chat,
+      discardSelection: viewer
+        ? room.discardSelections?.[viewer]
+        : undefined,
     };
     socket.emit("room", { ...view, paused: !!room.paused });
   }
@@ -991,6 +998,14 @@ function closeCompletedRoom(room: Room) {
   return true;
 }
 function changed(room: Room) {
+  if (room.discardSelections) {
+    const activeDiscards =
+      room.game?.phase === "discard" ? room.game.discards : {};
+    for (const playerId of Object.keys(room.discardSelections))
+      if (!activeDiscards[playerId]) delete room.discardSelections[playerId];
+    if (!Object.keys(room.discardSelections).length)
+      delete room.discardSelections;
+  }
   room.updated = Date.now();
   if (closeCompletedRoom(room)) return;
   refreshRoomAttendance(room, room.updated);
@@ -1437,6 +1452,21 @@ io.on("connection", (socket) => {
         changed(r);
         return ack({ ok: true });
       }
+      if (command.type === "discardSelection") {
+        const r = needPlayerRoom();
+        const g = r.game || fail("Start a game first.");
+        const turn = z.number().int().min(0).parse(command.turn);
+        if (turn !== g.turn || g.phase !== "discard" || !g.discards[session.id])
+          return ack({ ok: false, reason: "stale", version: g.version });
+        const cards = hand.parse(command.cards) as Hand;
+        const player = g.players.find((candidate) => candidate.id === session.id)!;
+        if (total(cards) > g.discards[session.id] || !canPay(player, cards))
+          fail("Choose only cards available in your hand.");
+        r.discardSelections ??= {};
+        if (total(cards)) r.discardSelections[session.id] = cards;
+        else delete r.discardSelections[session.id];
+        return ack({ ok: true });
+      }
       if (command.type === "action") {
         const r = needPlayerRoom();
         if (!r.game) fail("Start a game first.");
@@ -1503,7 +1533,7 @@ const tick = setInterval(
               if (g.discards[p.id]) {
                 const a = p.bot || p.automated
                   ? chooseBotAction(g, p)
-                  : chooseTimeoutAction(g, p);
+                  : chooseTimeoutAction(g, p, room.discardSelections?.[p.id]);
                 if (a) {
                   room.game = applyAction(g, p.id, a);
                   changed(room);

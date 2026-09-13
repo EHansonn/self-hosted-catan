@@ -306,6 +306,7 @@ export interface RoomView {
   players: PublicPlayer[];
   game: GameView | null;
   chat: { name: string; text: string; id: number }[];
+  discardSelection?: Hand;
 }
 
 export interface ResumeRoomView {

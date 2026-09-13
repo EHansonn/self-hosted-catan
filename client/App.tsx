@@ -525,6 +525,29 @@ export function App() {
     },
     [command],
   );
+  const updateDiscardSelection = useCallback((cards: Hand) => {
+    setDiscard(cards);
+    const activeRoom = roomRef.current;
+    const activeGame = activeRoom?.game;
+    const activeSocket = socket.current;
+    if (
+      !activeRoom ||
+      !activeGame ||
+      activeGame.phase !== "discard" ||
+      !activeGame.discards[activeRoom.me] ||
+      !activeSocket?.connected
+    )
+      return;
+    activeSocket.emit(
+      "command",
+      {
+        type: "discardSelection",
+        turn: activeGame.turn,
+        cards,
+      },
+      () => {},
+    );
+  }, []);
   useEffect(() => {
     fetch("/api/session")
       .then(async (response) => {
@@ -607,6 +630,12 @@ export function App() {
         setBuild(null);
         setDiscard(emptyHand());
       }
+      if (
+        r?.game?.phase === "discard" &&
+        r.game.discards[r.me] &&
+        r.discardSelection
+      )
+        setDiscard(r.discardSelection);
       if (!!previous?.game !== !!r?.game)
         window.scrollTo({ top: 0, behavior: "instant" });
       roomRef.current = r;
@@ -2402,7 +2431,7 @@ export function App() {
           </DialogDescription>
           <CardPicker
             value={discard}
-            onChange={setDiscard}
+            onChange={updateDiscardSelection}
             max={hand}
             maxTotal={game?.discards[room?.me || ""]}
             label="Discard"

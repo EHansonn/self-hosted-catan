@@ -17,7 +17,6 @@ import {
 } from "lucide-react";
 import type { Board, PublicPlayer, Resource } from "../shared/game";
 import type { GameplayAnimationCue } from "./gameAnimations";
-import { getAppName } from "./branding";
 import { harborTransformForEdge } from "./portOrientation";
 import { spriteViewBox } from "./sprites";
 import {
@@ -779,12 +778,6 @@ export function BoardView(props: BoardProps) {
           </button>
         </div>
       )}
-      <div className="board-caption">
-        {props.mode === "3d"
-          ? "Drag to orbit · pinch or scroll to zoom"
-          : "Drag to pan · pinch or scroll to zoom · tap an available location to build"}
-        <span>{getAppName()}</span>
-      </div>
     </div>
   );
 }

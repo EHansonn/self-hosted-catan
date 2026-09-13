@@ -648,6 +648,31 @@ test("the robber can never remain on its current hex, including timeouts", () =>
     }
   }
 });
+test("timed-out robber placement avoids the acting player's buildings when possible", () => {
+  const game = setup(fresh(4, 39));
+  game.phase = "robber";
+  const player = game.players[game.current];
+  const preferred = robberSites(game, player).filter((id) =>
+    game.board.tiles[id].vertices.every(
+      (vertexId) => game.board.vertices[vertexId].owner !== player.id,
+    ),
+  );
+  assert.ok(preferred.length > 0);
+
+  const move = chooseTimeoutAction(game, player);
+  assert.equal(move?.type, "robber");
+  if (move?.type === "robber") assert.ok(preferred.includes(move.id));
+
+  const noPreferredSite = structuredClone(game);
+  const fallbackPlayer = noPreferredSite.players[noPreferredSite.current];
+  noPreferredSite.board.vertices.forEach((vertex) => {
+    vertex.owner = fallbackPlayer.id;
+  });
+  const legal = robberSites(noPreferredSite, fallbackPlayer);
+  const fallback = chooseTimeoutAction(noPreferredSite, fallbackPlayer);
+  assert.equal(fallback?.type, "robber");
+  if (fallback?.type === "robber") assert.ok(legal.includes(fallback.id));
+});
 test("required actions, discards and main turns use their own clocks", () => {
   let opening = fresh();
   opening.options.timer = 60;
@@ -825,6 +850,25 @@ test("expired required actions choose random legal fallbacks", () => {
   const action = chooseTimeoutAction(discard, discard.players[0]);
   assert.equal(action?.type, "discard");
   if (action?.type === "discard") assert.equal(total(action.cards), 3);
+});
+test("expired discards preserve selected cards and fill only the remainder", () => {
+  const game = fresh();
+  game.phase = "discard";
+  game.discards = { p0: 5 };
+  game.players[0].resources = {
+    ...emptyHand(),
+    wood: 2,
+    brick: 1,
+    sheep: 3,
+  };
+  const selected = { ...emptyHand(), wood: 2, brick: 1 };
+
+  const action = chooseTimeoutAction(game, game.players[0], selected);
+
+  assert.deepEqual(action, {
+    type: "discard",
+    cards: { ...selected, sheep: 2 },
+  });
 });
 test("special build phases only run for an advance flag three seats ahead", () => {
   let g = setup(fresh(6));

@@ -259,15 +259,6 @@ select:focus-visible,
   color: #b9cedd;
   background: #17487130;
 }
-.board-caption {
-  color: #d4e5f3;
-  bottom: 8px;
-  left: 12px;
-  font-size: 12px;
-}
-.board-caption > span {
-  display: none;
-}
 .board-scroll {
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -2259,10 +2250,6 @@ input:focus {
     top: 6px;
     left: 6px;
     gap: 3px;
-  }
-  .board-caption {
-    font-size: 11px;
-    left: 8px;
   }
   .in-game .turn-banner {
     padding: 8px;

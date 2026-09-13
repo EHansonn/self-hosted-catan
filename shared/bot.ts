@@ -112,12 +112,40 @@ function randomItem<T>(g: Game, items: readonly T[]) {
     ? items[Math.floor(rng(g) * items.length)]
     : undefined;
 }
-export function chooseTimeoutAction(g: Game, p: Player): Action | null {
+function timeoutRobberSites(g: Game, p: Player) {
+  const legal = robberSites(g, p);
+  const withoutOwnBuildings = legal.filter((id) =>
+    g.board.tiles[id].vertices.every(
+      (vertexId) => g.board.vertices[vertexId].owner !== p.id,
+    ),
+  );
+  return withoutOwnBuildings.length ? withoutOwnBuildings : legal;
+}
+export function chooseTimeoutAction(
+  g: Game,
+  p: Player,
+  discardSelection?: Hand,
+): Action | null {
   if (g.phase === "finished") return null;
   if (g.phase === "discard" && g.discards[p.id]) {
-    const cards = emptyHand();
+    const required = g.discards[p.id];
+    const selectionIsValid =
+      !!discardSelection &&
+      RESOURCES.every(
+        (resource) =>
+          Number.isInteger(discardSelection[resource]) &&
+          discardSelection[resource] >= 0 &&
+          discardSelection[resource] <= p.resources[resource],
+      ) &&
+      total(discardSelection) <= required;
+    const cards = selectionIsValid
+      ? { ...discardSelection }
+      : emptyHand();
     const remaining = { ...p.resources };
-    for (let n = 0; n < g.discards[p.id]; n++) {
+    RESOURCES.forEach((resource) => {
+      remaining[resource] -= cards[resource];
+    });
+    for (let n = total(cards); n < required; n++) {
       let pick = Math.floor(rng(g) * total(remaining));
       const resource = RESOURCES.find((candidate) => {
         pick -= remaining[candidate];
@@ -140,7 +168,7 @@ export function chooseTimeoutAction(g: Game, p: Player): Action | null {
     return id === undefined ? null : { type: "road", id };
   }
   if (g.phase === "robber") {
-    const id = randomItem(g, robberSites(g, p));
+    const id = randomItem(g, timeoutRobberSites(g, p));
     return id === undefined ? null : { type: "robber", id };
   }
   if (g.phase === "steal") {
