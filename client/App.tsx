@@ -2816,8 +2816,10 @@ export function App() {
               settlement receives one card; each city receives two. The robber
               blocks its hex. Trade with the bank at 4:1, general ports at 3:1,
               or resource ports at 2:1. Player trades must involve the active
-              primary player. When Link 2 &amp; 12 is enabled, rolling either
-              number produces resources from both 2 and 12 hexes.
+              primary player. Other players approve a public offer, then its
+              creator chooses which approving player to trade with. When Link
+              2 &amp; 12 is enabled, rolling either number produces resources
+              from both 2 and 12 hexes.
             </p>
             <div className="rules-costs">
               {Object.entries(COSTS).map(([name, cost]) => (

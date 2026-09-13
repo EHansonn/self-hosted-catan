@@ -183,6 +183,7 @@ if (existsSync(storePath)) {
                 .map((player) => player.id)
             : [];
         r.game.resumeTime ??= null;
+        if (r.game.offer) r.game.offer.approved ??= [];
         if (r.paused) {
           const remaining = r.pausedRemainingMs;
           if (
@@ -634,7 +635,11 @@ const actionSchema = z.discriminatedUnion("type", [
   }),
   z.object({ type: z.literal("offer"), give: hand, want: hand }),
   z.object({ type: z.literal("counter"), offerId: z.number().int(), give: hand, want: hand }),
-  z.object({ type: z.literal("accept"), offerId: z.number().int() }),
+  z.object({
+    type: z.literal("accept"),
+    offerId: z.number().int(),
+    player: z.string().max(48).optional(),
+  }),
   z.object({ type: z.literal("reject"), offerId: z.number().int() }),
   z.object({
     type: z.literal("dev"),
@@ -1386,9 +1391,12 @@ io.on("connection", (socket) => {
         if (!r.game) fail("Start a game first.");
         if (r.paused) fail("The host has paused this table.");
         const version = z.number().int().parse(command.version);
-        if (version !== r.game.version)
-          fail("The board changed. Please try again.");
         const action = actionSchema.parse(command.action) as Action;
+        const respondingToCurrentOffer =
+          (action.type === "accept" || action.type === "reject") &&
+          r.game.offer?.id === action.offerId;
+        if (version !== r.game.version && !respondingToCurrentOffer)
+          fail("The board changed. Please try again.");
         r.game = applyAction(r.game, session.id, action);
         changed(r);
         return ack({ ok: true });

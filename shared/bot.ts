@@ -169,8 +169,26 @@ export function chooseBotAction(g: Game, p: Player): Action | null {
   }
   if (
     g.offer &&
+    !g.offer.to &&
+    g.offer.from === p.id &&
+    g.phase === "main"
+  ) {
+    if (!canPay(p, g.offer.give)) return { type: "cancelTrade" };
+    const approvedPlayer = g.offer.approved
+      .map((id) => g.players.find((player) => player.id === id))
+      .find((player) => player && canPay(player, g.offer!.want));
+    if (approvedPlayer)
+      return {
+        type: "accept",
+        offerId: g.offer.id,
+        player: approvedPlayer.id,
+      };
+  }
+  if (
+    g.offer &&
     g.offer.from !== p.id &&
     (!g.offer.to || g.offer.to === p.id) &&
+    !g.offer.approved.includes(p.id) &&
     !g.offer.rejected.includes(p.id) &&
     g.phase === "main"
   ) {

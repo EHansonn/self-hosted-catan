@@ -437,20 +437,48 @@ test("counteroffers preserve active-player trading, ownership and stale-offer sa
   g.secondary = true;
   assert.throws(() => applyAction(g, "p0", { type: "counter", offerId: counterId, give, want }), /available/);
 });
-test("player trades settle once and reject stale offers", () => {
+test("trade creators choose among approving players before cards move", () => {
   let g = setup(fresh());
   g.phase = "main";
   grant(g, "p0", { wood: 1 });
   grant(g, "p1", { ore: 1 });
+  grant(g, "p2", { ore: 1 });
   g = applyAction(g, "p0", {
     type: "offer",
     give: { ...emptyHand(), wood: 1 },
     want: { ...emptyHand(), ore: 1 },
   });
   const offerId = g.offer!.id;
+  const beforeApproval = structuredClone(g.players.map((player) => player.resources));
+  assert.throws(
+    () => applyAction(g, "p0", { type: "accept", offerId }),
+    /approved/,
+  );
   g = applyAction(g, "p1", { type: "accept", offerId });
+  g = applyAction(g, "p2", { type: "accept", offerId });
+  assert.deepEqual(g.offer!.approved, ["p1", "p2"]);
+  assert.deepEqual(
+    g.players.map((player) => player.resources),
+    beforeApproval,
+    "approvals must not move cards",
+  );
+  assert.throws(
+    () =>
+      applyAction(g, "p0", {
+        type: "accept",
+        offerId,
+        player: "p3",
+      }),
+    /approved/,
+  );
+  g = applyAction(g, "p0", { type: "accept", offerId, player: "p2" });
   assert.equal(g.offer, null);
-  assert.throws(() => applyAction(g, "p2", { type: "accept", offerId }));
+  assert.deepEqual(g.players[1].resources, beforeApproval[1]);
+  assert.equal(g.players[2].resources.ore, beforeApproval[2].ore - 1);
+  assert.equal(g.players[2].resources.wood, beforeApproval[2].wood + 1);
+  assert.equal(g.players[0].resources.wood, beforeApproval[0].wood - 1);
+  assert.equal(g.players[0].resources.ore, beforeApproval[0].ore + 1);
+  assert.throws(() => applyAction(g, "p1", { type: "accept", offerId }));
   invariant(g);
 });
 test("development card age, one per turn, two matching plenty cards and monopoly", () => {

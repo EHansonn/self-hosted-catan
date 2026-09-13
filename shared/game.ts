@@ -195,6 +195,7 @@ export interface Offer {
   to?: string;
   give: Hand;
   want: Hand;
+  approved: string[];
   rejected: string[];
 }
 export interface GameLogEntry {
@@ -248,7 +249,8 @@ export type Action =
   | { type: "bank"; give: Hand; want: Hand }
   | { type: "offer"; give: Hand; want: Hand }
   | { type: "counter"; offerId: number; give: Hand; want: Hand }
-  | { type: "accept" | "reject"; offerId: number }
+  | { type: "accept"; offerId: number; player?: string }
+  | { type: "reject"; offerId: number }
   | { type: "dev"; card: Exclude<Dev, "victory">; resources?: Resource[] };
 export type PublicPlayer = Omit<Player, "resources" | "dev"> & {
   resources?: Hand;
@@ -1004,6 +1006,19 @@ function handValid(h: Hand) {
     RESOURCES.every((r) => Number.isInteger(h[r]) && h[r] >= 0 && h[r] <= 120)
   );
 }
+function settlePlayerTrade(g: Game, offer: Offer, recipient: Player) {
+  const from = g.players.find((player) => player.id === offer.from)!;
+  ensure(
+    canPay(recipient, offer.want) && canPay(from, offer.give),
+    "One of you no longer has those cards.",
+  );
+  RESOURCES.forEach((resource) => {
+    from.resources[resource] += offer.want[resource] - offer.give[resource];
+    recipient.resources[resource] += offer.give[resource] - offer.want[resource];
+  });
+  note(g, `${recipient.name} trades with ${from.name}.`, "trade");
+  g.offer = null;
+}
 export function bankTradeUnits(give: Hand, rates: Hand) {
   if (!handValid(give)) return null;
   let units = 0;
@@ -1118,21 +1133,35 @@ function mutate(g: Game, id: string, a: Action) {
     ensure(handValid(a.give) && handValid(a.want) && total(a.give) > 0 && total(a.want) > 0 &&
       RESOURCES.every(r => !a.give[r] || !a.want[r]), "Offer and request different resources.");
     ensure(canPay(p, a.give), "You do not have the offered cards.");
-    g.offer = { id: g.version + 1, from: id, to: editingOwnCounter ? offer.to : offer.from, give: a.give, want: a.want, rejected: [] };
+    g.offer = { id: g.version + 1, from: id, to: editingOwnCounter ? offer.to : offer.from, give: a.give, want: a.want, approved: [], rejected: [] };
     note(g, `${p.name} makes a counteroffer.`, "trade");
     return;
   }
   if (a.type === "accept" || a.type === "reject") {
     const offer = g.offer;
+    const choosingApprovedPlayer =
+      a.type === "accept" && !offer?.to && offer?.from === id;
     ensure(
       g.phase === "main" &&
         !g.secondary &&
         offer &&
         offer.id === a.offerId &&
-        offer.from !== id && (!offer.to || offer.to === id),
+        (choosingApprovedPlayer ||
+          (offer.from !== id && (!offer.to || offer.to === id))),
       "That trade is no longer available.",
     );
+    if (choosingApprovedPlayer && a.type === "accept") {
+      ensure(
+        a.player && offer.approved.includes(a.player),
+        "Choose a player who approved this offer.",
+      );
+      const recipient = g.players.find((player) => player.id === a.player);
+      ensure(recipient, "That player is no longer available.");
+      settlePlayerTrade(g, offer, recipient);
+      return;
+    }
     if (a.type === "reject") {
+      offer.approved = offer.approved.filter((playerId) => playerId !== id);
       if (!offer.rejected.includes(id)) offer.rejected.push(id);
       return;
     }
@@ -1141,12 +1170,15 @@ function mutate(g: Game, id: string, a: Action) {
       canPay(p, offer.want) && canPay(from, offer.give),
       "One of you no longer has those cards.",
     );
-    RESOURCES.forEach((r) => {
-      from.resources[r] += offer.want[r] - offer.give[r];
-      p.resources[r] += offer.give[r] - offer.want[r];
-    });
-    note(g, `${p.name} trades with ${from.name}.`, "trade");
-    g.offer = null;
+    if (!offer.to) {
+      offer.rejected = offer.rejected.filter((playerId) => playerId !== id);
+      if (!offer.approved.includes(id)) {
+        offer.approved.push(id);
+        note(g, `${p.name} approves ${from.name}'s trade offer.`, "trade");
+      }
+      return;
+    }
+    settlePlayerTrade(g, offer, p);
     return;
   }
   ensure(g.players[g.current].id === id, "It's another player's turn.");
@@ -1406,6 +1438,7 @@ function mutate(g: Game, id: string, a: Action) {
       from: id,
       give: a.give,
       want: a.want,
+      approved: [],
       rejected: [],
     };
     note(g, `${p.name} offers a trade.`, "trade");

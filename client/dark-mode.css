@@ -332,6 +332,10 @@ html[data-color-theme="dark"] .hand-summary > span {
   color: #d6e1e7;
 }
 
+html[data-color-theme="dark"] .offer-guidance {
+  color: #bfd2dc;
+}
+
 html[data-color-theme="dark"] .game-dialog {
   border-color: #40586a !important;
   background: #132631 !important;
