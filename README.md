@@ -8,17 +8,21 @@ depending on a hosted browser service.
 
 ### Home screen
 
-![Crossroads home screen in dark mode](docs/screenshots/home.png)
+![Crossroads home screen in light mode](docs/screenshots/home.png)
 
 ### Game lobby
 
-![A Crossroads lobby with a map preview and four seats](docs/screenshots/lobby.png)
+![A Crossroads lobby in light mode with a map preview and four seats](docs/screenshots/lobby.png)
 
 ### Game in progress
 
-![A Crossroads game using the 2D board](docs/screenshots/game-2d.png)
+![A Crossroads game in progress using the 2D board in light mode](docs/screenshots/game-2d.png)
 
-![A Crossroads game using the 3D board](docs/screenshots/game-3d.png)
+![A Crossroads game in progress using the 3D board in light mode](docs/screenshots/game-3d.png)
+
+### Mobile
+
+![Crossroads home and in-progress game views shown inside phone frames](docs/screenshots/mobile.png)
 
 ## Commands
 
