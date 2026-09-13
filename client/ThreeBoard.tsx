@@ -528,20 +528,22 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
       const ctx = canvas.getContext("2d")!;
       const paintBadge = () => {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.beginPath();
+        ctx.arc(192, 192, 174, 0, Math.PI * 2);
         ctx.fillStyle = "#fff8df";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = `${portColor(resource)}24`;
-        ctx.fillRect(18, 18, 348, 242);
-        ctx.fillStyle = "#dff1ed";
-        ctx.fillRect(18, 270, 348, 96);
-        ctx.strokeStyle = "#6b897f";
-        ctx.lineWidth = 7;
-        ctx.strokeRect(18, 270, 348, 96);
+        ctx.fill();
+        ctx.lineWidth = 16;
+        ctx.strokeStyle = "#75411f";
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(192, 192, 151, 0, Math.PI * 2);
+        ctx.fillStyle = `${portColor(resource)}22`;
+        ctx.fill();
         ctx.fillStyle = "#243e47";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.font = "900 74px Arial Black, Arial, sans-serif";
-        ctx.fillText(ratio, 192, 320);
+        ctx.font = "900 66px Arial Black, Arial, sans-serif";
+        ctx.fillText(ratio, 192, 302);
       };
       paintBadge();
       const map = new THREE.CanvasTexture(canvas);
@@ -565,10 +567,10 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
           Math.floor(spriteIndex / 4) * cellHeight,
           cellWidth,
           cellHeight,
-          82,
-          27,
-          220,
-          220,
+          97,
+          48,
+          190,
+          190,
         );
         map.needsUpdate = true;
         s.dirty = true;
@@ -665,17 +667,17 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
         0.94,
       );
 
-      const badgePosition = harborLabelPosition(transform);
+      const badgePosition = harborLabelPosition(transform, 0.94);
       const badgeFrame = add(
-        new THREE.BoxGeometry(0.74, 0.065, 0.7),
+        new THREE.CylinderGeometry(0.31, 0.31, 0.055, 48),
         material("#75411f", { roughness: 0.72 }),
         badgePosition.x,
-        0.29,
+        0.36,
         badgePosition.z,
       );
       badgeFrame.rotation.y = 0;
       const badgeFace = add(
-        new THREE.PlaneGeometry(0.65, 0.61),
+        new THREE.CircleGeometry(0.275, 48),
         new THREE.MeshBasicMaterial({
           map: portBadgeTexture(
             resource,
@@ -684,91 +686,10 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
           toneMapped: false,
         }),
         badgePosition.x,
-        0.326,
+        0.389,
         badgePosition.z,
       );
       badgeFace.rotation.x = -Math.PI / 2;
-
-      const accent = portColor(resource);
-      if (resource === "wood") {
-        portAdd(
-          new THREE.CylinderGeometry(0.02, 0.03, 0.18, 6),
-          material("#634529"),
-          0.27,
-          0.43,
-          0.93,
-        );
-        portAdd(
-          new THREE.ConeGeometry(0.12, 0.24, 7),
-          material(accent),
-          0.27,
-          0.58,
-          0.93,
-        );
-      } else if (resource === "brick") {
-        for (const [x, y, z] of [
-          [0.2, 0.38, 0.88],
-          [0.34, 0.38, 0.88],
-          [0.27, 0.49, 0.88],
-        ])
-          portAdd(
-            new THREE.BoxGeometry(0.13, 0.09, 0.1),
-            material(accent),
-            x,
-            y,
-            z,
-          );
-      } else if (resource === "sheep") {
-        portAdd(
-          new THREE.SphereGeometry(0.12, 12, 8),
-          material("#f7f3df"),
-          0.26,
-          0.45,
-          0.91,
-        );
-        portAdd(
-          new THREE.SphereGeometry(0.065, 10, 7),
-          material("#35494c"),
-          0.37,
-          0.47,
-          0.91,
-        );
-      } else if (resource === "wheat") {
-        for (const x of [0.19, 0.27, 0.35]) {
-          portAdd(
-            new THREE.CylinderGeometry(0.012, 0.016, 0.26, 6),
-            material("#9a741c"),
-            x,
-            0.45,
-            0.9,
-          );
-          portAdd(
-            new THREE.SphereGeometry(0.035, 8, 6),
-            material(accent),
-            x,
-            0.59,
-            0.9,
-          );
-        }
-      } else if (resource === "ore") {
-        for (const [x, scale] of [[0.2, 0.12], [0.34, 0.09]] as const)
-          portAdd(
-            new THREE.DodecahedronGeometry(scale, 0),
-            material(accent, { flatShading: true }),
-            x,
-            0.42,
-            0.9,
-          );
-      } else {
-        for (const [index, cargoColor] of ["#4a9c58", "#cf7259", "#d9af2e"].entries())
-          portAdd(
-            new THREE.BoxGeometry(0.11, 0.11, 0.11),
-            material(cargoColor),
-            0.18 + index * 0.13,
-            0.4,
-            0.9,
-          );
-      }
 
       const description = document.createElement("span");
       const portName = resource === "any" ? "General" : TERRAIN[resource].label;
@@ -783,7 +704,7 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
         element: description,
         point: new THREE.Vector3(
           badgePosition.x,
-          0.34,
+          0.4,
           badgePosition.z,
         ),
       });

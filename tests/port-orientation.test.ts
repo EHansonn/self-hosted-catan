@@ -43,8 +43,8 @@ test("harbor labels sit outward from the coast without inheriting dock rotation"
     { x: 2, y: 1 },
     { x: 3, y: 2 },
   );
-  const label = harborLabelPosition(transform, 0.52);
+  const label = harborLabelPosition(transform, 0.94);
 
-  closeTo(label.x - transform.centerX, transform.outwardX * 0.52);
-  closeTo(label.z - transform.centerZ, transform.outwardZ * 0.52);
+  closeTo(label.x - transform.centerX, transform.outwardX * 0.94);
+  closeTo(label.z - transform.centerZ, transform.outwardZ * 0.94);
 });
