@@ -109,6 +109,7 @@ export interface Options {
   turnActionBonus: number;
   setupSettlementTimer: number;
   setupRoadTimer: number;
+  robberTimer: number;
   actionTimer: number;
   discardTimer: number;
   balanced: boolean;
@@ -124,6 +125,7 @@ export const DEFAULT_OPTIONS: Options = {
   turnActionBonus: 15,
   setupSettlementTimer: 120,
   setupRoadTimer: 20,
+  robberTimer: 20,
   actionTimer: 10,
   discardTimer: 20,
   balanced: true,
@@ -702,6 +704,8 @@ export function phaseTimerSeconds(options: Options, phase: Phase) {
     return options.setupSettlementTimer ?? DEFAULT_OPTIONS.setupSettlementTimer;
   if (phase === "setupRoad")
     return options.setupRoadTimer ?? DEFAULT_OPTIONS.setupRoadTimer;
+  if (phase === "robber")
+    return options.robberTimer ?? DEFAULT_OPTIONS.robberTimer;
   if (phase === "discard")
     return options.discardTimer ?? DEFAULT_OPTIONS.discardTimer;
   return options.actionTimer ?? DEFAULT_OPTIONS.actionTimer;

@@ -571,6 +571,16 @@ const optionsSchema = z.object({
     z.literal(45),
     z.literal(60),
   ]).default(20),
+  robberTimer: z.union([
+    z.literal(0),
+    z.literal(5),
+    z.literal(10),
+    z.literal(15),
+    z.literal(20),
+    z.literal(30),
+    z.literal(45),
+    z.literal(60),
+  ]).default(20),
   actionTimer: z.union([
     z.literal(0),
     z.literal(5),

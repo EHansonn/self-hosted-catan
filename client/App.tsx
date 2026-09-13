@@ -1496,6 +1496,21 @@ export function App() {
             <option value={60}>60 seconds</option>
           </LabelSelect>
           <LabelSelect
+            label="Robber placement timer"
+            value={room.options.robberTimer ?? DEFAULT_OPTIONS.robberTimer}
+            disabled={!host || pending}
+            onChange={(value) => updateRoomOptions({ robberTimer: Number(value) as Options["robberTimer"] })}
+          >
+            <option value={0}>No robber limit</option>
+            <option value={5}>5 seconds</option>
+            <option value={10}>10 seconds</option>
+            <option value={15}>15 seconds</option>
+            <option value={20}>20 seconds</option>
+            <option value={30}>30 seconds</option>
+            <option value={45}>45 seconds</option>
+            <option value={60}>60 seconds</option>
+          </LabelSelect>
+          <LabelSelect
             label="Action timer"
             value={room.options.actionTimer ?? DEFAULT_OPTIONS.actionTimer}
             disabled={!host || pending}
@@ -2566,6 +2581,10 @@ export function App() {
                 {(room.options.setupRoadTimer ?? DEFAULT_OPTIONS.setupRoadTimer)
                   ? `${room.options.setupRoadTimer ?? DEFAULT_OPTIONS.setupRoadTimer}s opening roads`
                   : "Untimed opening roads"}
+                {" · "}
+                {(room.options.robberTimer ?? DEFAULT_OPTIONS.robberTimer)
+                  ? `${room.options.robberTimer ?? DEFAULT_OPTIONS.robberTimer}s robber placements`
+                  : "Untimed robber placements"}
                 {" · "}
                 {(room.options.actionTimer ?? DEFAULT_OPTIONS.actionTimer)
                   ? `${room.options.actionTimer ?? DEFAULT_OPTIONS.actionTimer}s actions`

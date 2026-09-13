@@ -284,8 +284,8 @@ test("discard validates count; robber auto-steals a sole victim and asks among m
     cards: { ...emptyHand(), wood: 4 },
   });
   assert.equal(g.phase, "robber");
-  assert.ok(g.deadline! > Date.now() + 8000);
-  assert.ok(g.deadline! <= Date.now() + 10000);
+  assert.ok(g.deadline! > Date.now() + 18000);
+  assert.ok(g.deadline! <= Date.now() + 20000);
   const tile = g.board.tiles.find(
     (t) =>
       t.id !== g.robber &&
@@ -574,8 +574,8 @@ test("knight exposes every legal robber hex for circular placement targets", () 
   g = applyAction(g, "p0", { type: "dev", card: "knight" });
   const legal = viewGame(g, "p0").legal.robber;
   assert.equal(g.phase, "robber");
-  assert.ok(g.deadline! > Date.now() + 8000);
-  assert.ok(g.deadline! <= Date.now() + 10000);
+  assert.ok(g.deadline! > Date.now() + 18000);
+  assert.ok(g.deadline! <= Date.now() + 20000);
   assert.ok(g.resumeTime! > 58000);
   assert.equal(legal.length, g.board.tiles.length - 1);
   assert.ok(!legal.includes(oldRobber));
@@ -601,6 +601,7 @@ test("required actions, discards and main turns use their own clocks", () => {
   let turn = setup(fresh());
   turn.options.timer = 60;
   turn.options.actionTimer = 10;
+  turn.options.robberTimer = 20;
   turn.options.discardTimer = 20;
   turn.phase = "roll";
   turn.deadline = 1;
@@ -611,7 +612,7 @@ test("required actions, discards and main turns use their own clocks", () => {
   assert.equal(phaseTimerSeconds(turn.options, "roll"), 10);
   assert.equal(phaseTimerSeconds(turn.options, "setupSettlement"), 120);
   assert.equal(phaseTimerSeconds(turn.options, "setupRoad"), 20);
-  assert.equal(phaseTimerSeconds(turn.options, "robber"), 10);
+  assert.equal(phaseTimerSeconds(turn.options, "robber"), 20);
   assert.equal(phaseTimerSeconds(turn.options, "steal"), 10);
   assert.equal(phaseTimerSeconds(turn.options, "discard"), 20);
   assert.equal(phaseTimerSeconds(turn.options, "main"), 60);
@@ -695,7 +696,8 @@ test("builds and played development cards add configurable time to the active tu
   assert.equal(knight.phase, "robber");
   assert.ok(knight.resumeTime! > 19_000);
   assert.ok(knight.resumeTime! <= 20_000);
-  assert.ok(knight.deadline! <= Date.now() + 10_000);
+  assert.ok(knight.deadline! > Date.now() + 18_000);
+  assert.ok(knight.deadline! <= Date.now() + 20_000);
 
   let disabled = setup(fresh());
   disabled.phase = "main";
