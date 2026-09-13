@@ -18,6 +18,7 @@ import {
 import type { Board, PublicPlayer, Resource } from "../shared/game";
 import type { GameplayAnimationCue } from "./gameAnimations";
 import { getAppName } from "./branding";
+import { harborTransformForEdge } from "./portOrientation";
 import { spriteViewBox } from "./sprites";
 import {
   DEFAULT_BOARD_ZOOM,
@@ -104,6 +105,189 @@ function TokenNumber({ value, hot }: { value: number; hot: boolean }) {
           transform={`translate(${start + index * step} .105) scale(${scale})`}
         />
       ))}
+    </g>
+  );
+}
+
+function HarborDock2D({
+  a,
+  b,
+  resource,
+}: {
+  a: Board["vertices"][number];
+  b: Board["vertices"][number];
+  resource: Resource | "any";
+}) {
+  const edgeLength = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+  const tangentX = (b.x - a.x) / edgeLength;
+  const tangentY = (b.y - a.y) / edgeLength;
+  const {
+    centerX,
+    centerZ: centerY,
+    outwardX,
+    outwardZ: outwardY,
+  } = harborTransformForEdge(a, b);
+  const signX = centerX + outwardX * 0.59;
+  const signY = centerY + outwardY * 0.59;
+  const ratio = resource === "any" ? "3:1" : "2:1";
+  const portName = resource === "any" ? "General" : TERRAIN[resource].label;
+  const sprite = resource === "any" ? "unknown" : resource;
+  const dockTransform = `matrix(${tangentX} ${tangentY} ${outwardX} ${outwardY} ${centerX} ${centerY})`;
+
+  return (
+    <g
+      className="port-badge-2d port-dock-2d"
+      role="img"
+      aria-label={`${portName} harbor, trade ${ratio}`}
+    >
+      <title>{`${portName} harbor, trade ${ratio}`}</title>
+      <g transform={dockTransform} filter="url(#piece-shadow)" aria-hidden="true">
+        <path
+          d="M-.53 .04H-.28V.39H.28V.04H.53V.77H-.53Z"
+          fill="#173e5d"
+          opacity=".3"
+          transform="translate(0 .045)"
+        />
+        <rect
+          x="-.5"
+          y="-.035"
+          width=".2"
+          height=".55"
+          rx=".035"
+          fill="url(#port-deck-wood)"
+          stroke="#6e3a1d"
+          strokeWidth=".026"
+        />
+        <rect
+          x=".3"
+          y="-.035"
+          width=".2"
+          height=".55"
+          rx=".035"
+          fill="url(#port-deck-wood)"
+          stroke="#6e3a1d"
+          strokeWidth=".026"
+        />
+        <rect
+          x="-.55"
+          y=".39"
+          width="1.1"
+          height=".34"
+          rx=".045"
+          fill="url(#port-deck-wood)"
+          stroke="#6e3a1d"
+          strokeWidth=".03"
+        />
+        {[0.08, 0.2, 0.32].map((plank) => (
+          <g key={plank} stroke="#7d431f" strokeWidth=".018" opacity=".68">
+            <line x1="-.49" y1={plank} x2="-.31" y2={plank} />
+            <line x1=".31" y1={plank} x2=".49" y2={plank} />
+          </g>
+        ))}
+        {[-0.36, -0.18, 0, 0.18, 0.36].map((plank) => (
+          <line
+            key={plank}
+            x1={plank}
+            y1=".405"
+            x2={plank}
+            y2=".715"
+            stroke="#7d431f"
+            strokeWidth=".018"
+            opacity=".7"
+          />
+        ))}
+        {[
+          [-0.5, 0.01],
+          [0.5, 0.01],
+          [-0.54, 0.69],
+          [0.54, 0.69],
+        ].map(([postX, postY]) => (
+          <g key={`${postX}-${postY}`}>
+            <circle cx={postX} cy={postY + 0.025} r=".055" fill="#372116" opacity=".5" />
+            <circle cx={postX} cy={postY} r=".052" fill="#5d351f" stroke="#321d13" strokeWidth=".018" />
+            <circle cx={postX - 0.012} cy={postY - 0.012} r=".014" fill="#b77a45" opacity=".8" />
+          </g>
+        ))}
+        <path
+          d="M-.47 .02Q-.59 .22-.5 .43M.47 .02Q.59 .22.5 .43"
+          fill="none"
+          stroke="#e2c075"
+          strokeWidth=".022"
+          strokeLinecap="round"
+          opacity=".82"
+        />
+      </g>
+      <g className="port-sign-2d" aria-hidden="true">
+        <rect
+          x={signX - 0.265}
+          y={signY - 0.255 + 0.035}
+          width=".53"
+          height=".51"
+          rx=".055"
+          fill="#173e5d"
+          opacity=".36"
+        />
+        <rect
+          x={signX - 0.265}
+          y={signY - 0.255}
+          width=".53"
+          height=".51"
+          rx=".055"
+          fill="url(#port-sign-wood)"
+          stroke="#60351c"
+          strokeWidth=".026"
+        />
+        <rect
+          x={signX - 0.22}
+          y={signY - 0.215}
+          width=".44"
+          height=".36"
+          rx=".035"
+          fill="#fff8df"
+          stroke="#e0c68e"
+          strokeWidth=".015"
+        />
+        <svg
+          x={signX - 0.145}
+          y={signY - 0.195}
+          width=".29"
+          height=".29"
+          viewBox={spriteViewBox(sprite)}
+        >
+          <image href="/textures/game-sprites.png" width="4" height="4" />
+        </svg>
+        <rect
+          x={signX - 0.2}
+          y={signY + 0.085}
+          width=".4"
+          height=".125"
+          rx=".025"
+          fill="#dff1ed"
+          stroke="#6b897f"
+          strokeWidth=".012"
+        />
+        <text
+          x={signX}
+          y={signY + 0.181}
+          textAnchor="middle"
+          fontSize=".132"
+          fill="#243e47"
+          fontWeight="900"
+        >
+          {ratio}
+        </text>
+        {[-0.22, 0.22].map((bolt) => (
+          <circle
+            key={bolt}
+            cx={signX + bolt}
+            cy={signY - 0.205}
+            r=".014"
+            fill="#f0c15f"
+            stroke="#66401f"
+            strokeWidth=".007"
+          />
+        ))}
+      </g>
     </g>
   );
 }
@@ -564,6 +748,15 @@ function Board2D({
           <stop offset=".45" stopColor="#d8ed71" />
           <stop offset="1" stopColor="#9eb33a" />
         </radialGradient>
+        <linearGradient id="port-deck-wood" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#efb356" />
+          <stop offset=".5" stopColor="#c87831" />
+          <stop offset="1" stopColor="#965023" />
+        </linearGradient>
+        <linearGradient id="port-sign-wood" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#c97c39" />
+          <stop offset="1" stopColor="#84451f" />
+        </linearGradient>
       </defs>
       {[{ color: "#61badd", width: .38 }, { color: "#abe6ed", width: .26 }, { color: "#ffe4a3", width: .15 }].map(coast => <g key={coast.width} stroke={coast.color} strokeWidth={coast.width} strokeLinejoin="round" fill={coast.color}>
         {board.tiles.map(t => <polygon key={t.id} points={t.vertices.map(id => `${board.vertices[id].x},${board.vertices[id].y}`).join(" ")} />)}
@@ -687,83 +880,14 @@ function Board2D({
         );
       })}
       {board.ports.map((port, i) => {
-        const e = board.edges[port.edge],
-          a = board.vertices[e.a],
-          b = board.vertices[e.b],
-          x = (a.x + b.x) / 2,
-          y = (a.y + b.y) / 2,
-          len = Math.hypot(x, y),
-          px = x + (x / len) * 0.56,
-          py = y + (y / len) * 0.56,
-          ratio = port.resource === "any" ? "3:1" : "2:1",
-          portName = port.resource === "any" ? "General" : TERRAIN[port.resource].label,
-          sprite = port.resource === "any" ? "unknown" : port.resource;
+        const edge = board.edges[port.edge];
         return (
-          <g
+          <HarborDock2D
             key={i}
-            className="port-badge-2d"
-            role="img"
-            aria-label={`${portName} harbor, trade ${ratio}`}
-          >
-            <title>{`${portName} harbor, trade ${ratio}`}</title>
-            <path
-              d={`M${a.x} ${a.y} L${px} ${py} L${b.x} ${b.y}`}
-              fill="none"
-              stroke="#c9b181"
-              strokeWidth=".025"
-              opacity=".6"
-            />
-            <circle
-              cx={px}
-              cy={py}
-              r=".3"
-              fill="#173e5d"
-              opacity=".34"
-              transform="translate(0 .035)"
-            />
-            <circle
-              cx={px}
-              cy={py}
-              r=".285"
-              fill="#fff7db"
-              stroke="#d5b77e"
-              strokeWidth=".028"
-            />
-            <svg
-              x={px - 0.17}
-              y={py - 0.235}
-              width=".34"
-              height=".34"
-              viewBox={spriteViewBox(sprite)}
-              aria-hidden="true"
-            >
-              <image
-                href="/textures/game-sprites.png"
-                width="4"
-                height="4"
-              />
-            </svg>
-            <rect
-              x={px - 0.19}
-              y={py + 0.075}
-              width=".38"
-              height=".135"
-              rx=".055"
-              fill="#fffdf5"
-              stroke="#d8c69f"
-              strokeWidth=".014"
-            />
-            <text
-              x={px}
-              y={py + 0.177}
-              textAnchor="middle"
-              fontSize=".14"
-              fill="#324858"
-              fontWeight="850"
-            >
-              {ratio}
-            </text>
-          </g>
+            a={board.vertices[edge.a]}
+            b={board.vertices[edge.b]}
+            resource={port.resource}
+          />
         );
       })}
       {board.edges

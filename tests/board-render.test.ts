@@ -12,7 +12,7 @@ test("the 2D robber renders as a top-layer mobile-safe SVG marker", () => {
     createElement(BoardPreview, { board, seed: 42 }),
   );
   const marker = markup.indexOf(`data-robber-tile="${robber.id}"`);
-  const lastPortBadge = markup.lastIndexOf('class="port-badge-2d"');
+  const lastPortBadge = markup.lastIndexOf('class="port-badge-2d');
 
   assert.ok(marker >= 0);
   assert.ok(lastPortBadge >= 0);
