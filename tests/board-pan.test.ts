@@ -6,6 +6,7 @@ import {
   MAX_BOARD_ZOOM,
   MIN_BOARD_ZOOM,
   boardPanPosition,
+  boardPinchZoom,
   boardWheelZoom,
   boardZoomAnchor,
   normalizeBoardZoom,
@@ -81,6 +82,13 @@ test("wheel direction zooms smoothly within bounds", () => {
   assert.equal(boardWheelZoom(MAX_BOARD_ZOOM, -100), MAX_BOARD_ZOOM);
   assert.equal(boardWheelZoom(MIN_BOARD_ZOOM, 100), MIN_BOARD_ZOOM);
   assert.equal(boardWheelZoom(1, 0), 1);
+});
+
+test("pinch distance zooms proportionally and stays within bounds", () => {
+  assert.equal(boardPinchZoom(0.8, 100, 200), 1.6);
+  assert.equal(boardPinchZoom(1, 100, 1_000), MAX_BOARD_ZOOM);
+  assert.equal(boardPinchZoom(1, 100, 1), MIN_BOARD_ZOOM);
+  assert.equal(boardPinchZoom(1.2, 0, 200), 1.2);
 });
 
 test("wheel zoom preserves the hovered board point while enlarged", () => {

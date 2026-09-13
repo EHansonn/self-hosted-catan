@@ -30,6 +30,23 @@ export function boardWheelZoom(
   );
 }
 
+export function boardPinchZoom(
+  initialZoom: number,
+  initialDistance: number,
+  currentDistance: number,
+) {
+  if (
+    !Number.isFinite(initialDistance) ||
+    !Number.isFinite(currentDistance) ||
+    initialDistance <= 0 ||
+    currentDistance <= 0
+  )
+    return normalizeBoardZoom(initialZoom);
+  return normalizeBoardZoom(
+    initialZoom * (currentDistance / initialDistance),
+  );
+}
+
 export interface BoardZoomAnchor {
   x: number;
   y: number;

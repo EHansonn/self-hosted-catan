@@ -25,6 +25,7 @@ import {
   MAX_BOARD_ZOOM,
   MIN_BOARD_ZOOM,
   boardPanPosition,
+  boardPinchZoom,
   boardWheelZoom,
   boardZoomAnchor,
   normalizeBoardZoom,
@@ -414,6 +415,9 @@ export function BoardView(props: BoardProps) {
   const zoomRef = useRef(zoom);
   const zoomAnchor = useRef<BoardZoomAnchor | null>(null);
   const panOrigin = useRef<BoardPanOrigin | null>(null);
+  const touchPoints = useRef(new Map<number, { x: number; y: number }>());
+  const pinchOrigin = useRef<{ distance: number; zoom: number } | null>(null);
+  const touchGestureMoved = useRef(false);
   const suppressClickUntil = useRef(0);
   const hintedSites = buildHint ? props.buildOptions?.[buildHint] : undefined;
   const displayedKind =
@@ -476,16 +480,43 @@ export function BoardView(props: BoardProps) {
     viewport.addEventListener("wheel", handleWheel, { passive: false });
     return () => viewport.removeEventListener("wheel", handleWheel);
   }, [props.mode]);
+  const canPan = (viewport: HTMLDivElement) =>
+    viewport.scrollWidth > viewport.clientWidth + 1 ||
+    viewport.scrollHeight > viewport.clientHeight + 1;
   const beginPan = (event: React.PointerEvent<HTMLDivElement>) => {
     const viewport = boardScroll.current;
-    if (
-      !viewport ||
-      event.pointerType !== "mouse" ||
-      event.button !== 0 ||
-      (viewport.scrollWidth <= viewport.clientWidth + 1 &&
-        viewport.scrollHeight <= viewport.clientHeight + 1)
-    )
+    if (!viewport) return;
+    if (event.pointerType === "touch") {
+      touchPoints.current.set(event.pointerId, {
+        x: event.clientX,
+        y: event.clientY,
+      });
+      if (touchPoints.current.size === 1) {
+        touchGestureMoved.current = false;
+        if (!canPan(viewport)) return;
+      } else if (touchPoints.current.size === 2) {
+        const [first, second] = [...touchPoints.current.values()];
+        pinchOrigin.current = {
+          distance: Math.hypot(second.x - first.x, second.y - first.y),
+          zoom: zoomRef.current,
+        };
+        panOrigin.current = null;
+        touchGestureMoved.current = true;
+        setPanning(true);
+        for (const pointerId of touchPoints.current.keys()) {
+          if (!viewport.hasPointerCapture(pointerId))
+            viewport.setPointerCapture(pointerId);
+        }
+        event.preventDefault();
+        return;
+      } else {
+        return;
+      }
+    } else if (event.pointerType !== "mouse" || event.button !== 0) {
       return;
+    } else if (!canPan(viewport)) {
+      return;
+    }
     panOrigin.current = {
       pointerId: event.pointerId,
       x: event.clientX,
@@ -497,6 +528,29 @@ export function BoardView(props: BoardProps) {
   };
   const movePan = (event: React.PointerEvent<HTMLDivElement>) => {
     const viewport = boardScroll.current;
+    if (viewport && event.pointerType === "touch") {
+      if (!touchPoints.current.has(event.pointerId)) return;
+      touchPoints.current.set(event.pointerId, {
+        x: event.clientX,
+        y: event.clientY,
+      });
+      const pinch = pinchOrigin.current;
+      if (pinch && touchPoints.current.size >= 2) {
+        const [first, second] = [...touchPoints.current.values()];
+        const nextZoom = boardPinchZoom(
+          pinch.zoom,
+          pinch.distance,
+          Math.hypot(second.x - first.x, second.y - first.y),
+        );
+        const bounds = viewport.getBoundingClientRect();
+        setBoardZoom(nextZoom, {
+          x: (first.x + second.x) / 2 - bounds.left,
+          y: (first.y + second.y) / 2 - bounds.top,
+        });
+        event.preventDefault();
+        return;
+      }
+    }
     const origin = panOrigin.current;
     if (!viewport || !origin || origin.pointerId !== event.pointerId) return;
     const next = boardPanPosition(origin, event.clientX, event.clientY);
@@ -505,6 +559,7 @@ export function BoardView(props: BoardProps) {
       origin.moved = true;
       viewport.setPointerCapture(event.pointerId);
       setPanning(true);
+      if (event.pointerType === "touch") touchGestureMoved.current = true;
     }
     event.preventDefault();
     viewport.scrollLeft = next.scrollLeft;
@@ -512,11 +567,39 @@ export function BoardView(props: BoardProps) {
   };
   const finishPan = (event: React.PointerEvent<HTMLDivElement>) => {
     const viewport = boardScroll.current;
+    if (event.pointerType === "touch") {
+      touchPoints.current.delete(event.pointerId);
+      if (pinchOrigin.current) {
+        pinchOrigin.current = null;
+        suppressClickUntil.current = performance.now() + 350;
+        const remaining = [...touchPoints.current.entries()][0];
+        panOrigin.current =
+          viewport && remaining && canPan(viewport)
+            ? {
+                pointerId: remaining[0],
+                x: remaining[1].x,
+                y: remaining[1].y,
+                scrollLeft: viewport.scrollLeft,
+                scrollTop: viewport.scrollTop,
+                moved: false,
+              }
+            : null;
+        setPanning(false);
+      }
+      if (touchPoints.current.size === 0) {
+        if (touchGestureMoved.current)
+          suppressClickUntil.current = performance.now() + 350;
+        touchGestureMoved.current = false;
+      }
+    }
     const origin = panOrigin.current;
-    if (!origin || origin.pointerId !== event.pointerId) return;
-    if (origin.moved) suppressClickUntil.current = performance.now() + 250;
-    panOrigin.current = null;
-    setPanning(false);
+    if (origin && origin.pointerId === event.pointerId) {
+      if (origin.moved)
+        suppressClickUntil.current =
+          performance.now() + (event.pointerType === "touch" ? 350 : 250);
+      panOrigin.current = null;
+      setPanning(false);
+    }
     if (viewport?.hasPointerCapture(event.pointerId))
       viewport.releasePointerCapture(event.pointerId);
   };
@@ -645,7 +728,7 @@ export function BoardView(props: BoardProps) {
       <div className="board-caption">
         {props.mode === "3d"
           ? "Drag to orbit · pinch or scroll to zoom"
-          : "Drag to pan · scroll to zoom · tap an available location to build"}
+          : "Drag to pan · pinch or scroll to zoom · tap an available location to build"}
         <span>{getAppName()}</span>
       </div>
     </div>
