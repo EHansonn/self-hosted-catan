@@ -37,6 +37,13 @@ button.game-card:disabled { opacity: .42; }
 .game-actions .action-tile { aspect-ratio: auto; width: 100%; height: 100%; }
 .trade-action-art { position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }.trade-action-art .game-card { --card-width: 21px; position: absolute; left: 12%; top: 3%; transform: rotate(-7deg); }.trade-action-art .game-card:last-child { left: auto; top: auto; bottom: 3%; right: 12%; transform: rotate(7deg); }.trade-action-art > svg { width: 95%; height: 80%; color: white; stroke-width: 2; filter: drop-shadow(0 1px 1px #234653); }
 .in-game.app,.in-game .board-shell { background: var(--game-ocean); }
+.in-game button,
+.in-game button *,
+.in-game [role="button"],
+.in-game [role="button"] * {
+  -webkit-user-select: none;
+  user-select: none;
+}
 .in-game .three-board { overflow: clip; contain: layout paint; overscroll-behavior: contain; }
 .in-game .workspace { grid-template-columns: minmax(0,1fr) 320px; padding: 8px 10px 12px; gap: 9px; height: max(620px,calc(100dvh - 58px)); }
 .in-game .table-area { grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr); grid-template-rows: 27px minmax(240px,1fr) 46px 88px; gap: 7px; }
