@@ -141,7 +141,7 @@ function HarborDock2D({
       aria-label={`${portName} harbor, trade ${ratio}`}
     >
       <title>{`${portName} harbor, trade ${ratio}`}</title>
-      <g transform={dockTransform} filter="url(#piece-shadow)" aria-hidden="true">
+      <g transform={dockTransform} aria-hidden="true">
         <path
           d="M-.53 .04H-.28V.39H.28V.04H.53V.77H-.53Z"
           fill="#173e5d"
