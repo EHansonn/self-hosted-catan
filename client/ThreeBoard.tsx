@@ -3,7 +3,10 @@ import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { TERRAIN, type BoardProps, type BuildPiece } from "./Board";
-import { harborTransformForEdge } from "./portOrientation";
+import {
+  harborLabelPosition,
+  harborTransformForEdge,
+} from "./portOrientation";
 
 type Stage = {
   scene: THREE.Scene;
@@ -512,84 +515,66 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
               : resource === "ore"
                 ? "#77969a"
                 : "#4aa8bd";
-    const portSail = (
+    const portBadgeTexture = (
       resource: (typeof board.ports)[number]["resource"],
       ratio: string,
     ) => {
+      const textureKey = `port-badge-${resource}`;
+      const cached = s.textures.get(textureKey);
+      if (cached) return cached;
       const canvas = document.createElement("canvas");
       canvas.width = 384;
       canvas.height = 384;
       const ctx = canvas.getContext("2d")!;
-      ctx.shadowColor = "rgba(20, 46, 55, .45)";
-      ctx.shadowBlur = 12;
-      ctx.shadowOffsetY = 9;
-      ctx.beginPath();
-      ctx.moveTo(66, 326);
-      ctx.lineTo(324, 326);
-      ctx.lineTo(104, 34);
-      ctx.closePath();
-      ctx.fillStyle = "#fff6d6";
-      ctx.fill();
-      ctx.shadowColor = "transparent";
-      ctx.lineWidth = 15;
-      ctx.lineJoin = "round";
-      ctx.strokeStyle = "#8b6035";
-      ctx.stroke();
-      ctx.save();
-      ctx.clip();
-      ctx.fillStyle = portColor(resource);
-      ctx.fillRect(48, 250, 300, 76);
-      ctx.restore();
-      ctx.fillStyle = "#254553";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.font = "900 58px Arial Black, Arial, sans-serif";
-      ctx.fillText(ratio, 190, 210);
-      ctx.fillStyle = "#173744";
-      ctx.font = `900 ${resource === "any" ? 38 : 32}px Arial Black, Arial, sans-serif`;
-      ctx.fillText(
-        resource === "any" ? "ANY" : TERRAIN[resource].label.toUpperCase(),
-        190,
-        286,
-      );
+      const paintBadge = () => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "#fff8df";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = `${portColor(resource)}24`;
+        ctx.fillRect(18, 18, 348, 242);
+        ctx.fillStyle = "#dff1ed";
+        ctx.fillRect(18, 270, 348, 96);
+        ctx.strokeStyle = "#6b897f";
+        ctx.lineWidth = 7;
+        ctx.strokeRect(18, 270, 348, 96);
+        ctx.fillStyle = "#243e47";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.font = "900 74px Arial Black, Arial, sans-serif";
+        ctx.fillText(ratio, 192, 320);
+      };
+      paintBadge();
       const map = new THREE.CanvasTexture(canvas);
       map.colorSpace = THREE.SRGBColorSpace;
       map.userData.label = true;
-      const sail = new THREE.Group();
-      const geometry = new THREE.PlaneGeometry(1, 1);
-      const front = new THREE.Mesh(
-        geometry,
-        new THREE.MeshBasicMaterial({
-          map,
-          transparent: true,
-          alphaTest: 0.03,
-          depthTest: true,
-          depthWrite: false,
-          side: THREE.FrontSide,
-          toneMapped: false,
-        }),
-      );
-      front.position.x = 0.23;
-      const backMap = map.clone();
-      backMap.userData.label = true;
-      backMap.needsUpdate = true;
-      const back = new THREE.Mesh(
-        geometry.clone(),
-        new THREE.MeshBasicMaterial({
-          map: backMap,
-          transparent: true,
-          alphaTest: 0.03,
-          depthTest: true,
-          depthWrite: false,
-          side: THREE.FrontSide,
-          toneMapped: false,
-        }),
-      );
-      back.position.x = 0.23;
-      back.rotation.y = Math.PI;
-      sail.add(front, back);
-      sail.scale.set(0.78, 0.78, 1);
-      return sail;
+      map.anisotropy = Math.min(8, s.renderer.capabilities.getMaxAnisotropy());
+      s.textures.set(textureKey, map);
+
+      const image = new Image();
+      image.onload = () => {
+        paintBadge();
+        const spriteIndex =
+          resource === "any"
+            ? 5
+            : ["wood", "brick", "sheep", "wheat", "ore"].indexOf(resource);
+        const cellWidth = image.naturalWidth / 4;
+        const cellHeight = image.naturalHeight / 4;
+        ctx.drawImage(
+          image,
+          (spriteIndex % 4) * cellWidth,
+          Math.floor(spriteIndex / 4) * cellHeight,
+          cellWidth,
+          cellHeight,
+          82,
+          27,
+          220,
+          220,
+        );
+        map.needsUpdate = true;
+        s.dirty = true;
+      };
+      image.src = "/textures/game-sprites.png";
+      return map;
     };
     const addPortModel = (
       edge: (typeof board.edges)[number],
@@ -597,13 +582,12 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
     ) => {
       const a = board.vertices[edge.a];
       const b = board.vertices[edge.b];
+      const transform = harborTransformForEdge(a, b);
       const {
         centerX,
         centerZ,
-        outwardX,
-        outwardZ,
         rotationY,
-      } = harborTransformForEdge(a, b);
+      } = transform;
       const harbor = new THREE.Group();
       harbor.position.set(centerX, 0, centerZ);
       harbor.rotation.y = rotationY;
@@ -680,17 +664,30 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
         0.31,
         0.94,
       );
-      portAdd(
-        new THREE.CylinderGeometry(0.025, 0.035, 0.73, 8),
-        material("#54351f"),
-        -0.1,
-        0.66,
-        0.94,
+
+      const badgePosition = harborLabelPosition(transform);
+      const badgeFrame = add(
+        new THREE.BoxGeometry(0.74, 0.065, 0.7),
+        material("#75411f", { roughness: 0.72 }),
+        badgePosition.x,
+        0.29,
+        badgePosition.z,
       );
-      const sail = portSail(resource, resource === "any" ? "3:1" : "2:1");
-      sail.position.set(-0.1, 0.75, 0.94);
-      sail.rotation.y = Math.PI / 8;
-      harbor.add(sail);
+      badgeFrame.rotation.y = 0;
+      const badgeFace = add(
+        new THREE.PlaneGeometry(0.65, 0.61),
+        new THREE.MeshBasicMaterial({
+          map: portBadgeTexture(
+            resource,
+            resource === "any" ? "3:1" : "2:1",
+          ),
+          toneMapped: false,
+        }),
+        badgePosition.x,
+        0.326,
+        badgePosition.z,
+      );
+      badgeFace.rotation.x = -Math.PI / 2;
 
       const accent = portColor(resource);
       if (resource === "wood") {
@@ -785,9 +782,9 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
       s.targets.push({
         element: description,
         point: new THREE.Vector3(
-          centerX + outwardX * 0.94,
-          0.7,
-          centerZ + outwardZ * 0.94,
+          badgePosition.x,
+          0.34,
+          badgePosition.z,
         ),
       });
     };

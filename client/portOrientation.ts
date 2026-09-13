@@ -11,6 +11,19 @@ export interface HarborTransform {
   rotationY: number;
 }
 
+export function harborLabelPosition(
+  transform: Pick<
+    HarborTransform,
+    "centerX" | "centerZ" | "outwardX" | "outwardZ"
+  >,
+  offset = 0.52,
+) {
+  return {
+    x: transform.centerX + transform.outwardX * offset,
+    z: transform.centerZ + transform.outwardZ * offset,
+  };
+}
+
 export function harborTransformForEdge(
   a: BoardPoint,
   b: BoardPoint,

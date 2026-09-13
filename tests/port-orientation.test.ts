@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { harborTransformForEdge } from "../client/portOrientation";
+import {
+  harborLabelPosition,
+  harborTransformForEdge,
+} from "../client/portOrientation";
 
 const closeTo = (actual: number, expected: number) =>
   assert.ok(Math.abs(actual - expected) < 1e-10, `${actual} != ${expected}`);
@@ -33,4 +36,15 @@ test("harbor orientation is stable when an edge's vertices are reversed", () => 
   closeTo(forward.outwardX, reverse.outwardX);
   closeTo(forward.outwardZ, reverse.outwardZ);
   closeTo(forward.rotationY, reverse.rotationY);
+});
+
+test("harbor labels sit outward from the coast without inheriting dock rotation", () => {
+  const transform = harborTransformForEdge(
+    { x: 2, y: 1 },
+    { x: 3, y: 2 },
+  );
+  const label = harborLabelPosition(transform, 0.52);
+
+  closeTo(label.x - transform.centerX, transform.outwardX * 0.52);
+  closeTo(label.z - transform.centerZ, transform.outwardZ * 0.52);
 });
