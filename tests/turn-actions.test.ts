@@ -49,21 +49,24 @@ test("an empty hand with no playable development cards prompts ending the turn",
   assert.equal(hasRemainingTurnAction(game, player), false);
 });
 
-test("affordable builds, purchases and trades keep the end-turn prompt quiet", () => {
+test("affordable builds and purchases keep the end-turn prompt quiet", () => {
   const { game, player } = turnState();
   player.resources = { ...emptyHand(), wood: 1, brick: 1 };
   assert.equal(hasRemainingTurnAction(game, player), true);
 
   player.resources = { ...emptyHand(), sheep: 1, wheat: 1, ore: 1 };
   assert.equal(hasRemainingTurnAction(game, player), true);
+});
 
+test("possible player and bank trades do not suppress the end-turn prompt", () => {
+  const { game, player } = turnState();
   player.resources = { ...emptyHand(), wood: 1 };
   game.legal.roads = [];
-  assert.equal(hasRemainingTurnAction(game, player), true);
+  assert.equal(hasRemainingTurnAction(game, player), false);
 
   player.resources = { ...emptyHand(), wood: 4 };
   game.secondary = true;
-  assert.equal(hasRemainingTurnAction(game, player), true);
+  assert.equal(hasRemainingTurnAction(game, player), false);
 });
 
 test("only development cards that can be played now count as remaining actions", () => {

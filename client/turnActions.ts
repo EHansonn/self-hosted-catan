@@ -9,12 +9,12 @@ import {
 
 type TurnActionGame = Pick<
   GameView,
-  "bank" | "deckCount" | "legal" | "players" | "secondary" | "turn"
+  "bank" | "deckCount" | "legal" | "turn"
 >;
 
 type TurnActionPlayer = Pick<
   PublicPlayer,
-  "dev" | "id" | "playedDev" | "resources"
+  "dev" | "playedDev" | "resources"
 >;
 
 export function hasRemainingTurnAction(
@@ -31,23 +31,6 @@ export function hasRemainingTurnAction(
     (game.legal.settlements.length && canAfford(COSTS.settlement)) ||
     (game.legal.cities.length && canAfford(COSTS.city)) ||
     (game.deckCount && canAfford(COSTS.development))
-  )
-    return true;
-
-  if (
-    RESOURCES.some(
-      (give) =>
-        game.legal.ratios[give] > 0 &&
-        hand[give] >= game.legal.ratios[give] &&
-        RESOURCES.some((want) => want !== give && game.bank[want] > 0),
-    )
-  )
-    return true;
-
-  if (
-    !game.secondary &&
-    total(hand) > 0 &&
-    game.players.some((candidate) => candidate.id !== player.id)
   )
     return true;
 
