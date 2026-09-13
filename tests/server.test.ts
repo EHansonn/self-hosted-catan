@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { io, type Socket } from "socket.io-client";
 import { COLORS, DEFAULT_OPTIONS, makeBoard, type RoomView, type ResumeRoomView, type Action } from "../shared/game";
 import type { CommunityView } from "../shared/community";
+type LiveRoomView = RoomView & { paused: boolean };
 const key = "test-only-crossroads-key",
   url = "http://127.0.0.1:18341";
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -64,7 +65,7 @@ test("packaged server: guest joins, creator-only rooms, scaled tables, privacy, 
       reconnection: false,
     });
     sockets.push(s);
-    let state: RoomView | null = null;
+    let state: LiveRoomView | null = null;
     let resumable: ResumeRoomView[] = [];
     let community: CommunityView | null = null;
     s.on("room", (r) => (state = r));
@@ -525,11 +526,15 @@ test("packaged server: guest joins, creator-only rooms, scaled tables, privacy, 
       false,
     );
     assert.equal((await clients[1].cmd({ type: "close" })).ok, false);
+    assert.equal((await clients[1].cmd({ type: "pause" })).ok, false);
     assert.equal(
       (await clients[1].cmd({ type: "takeover", id: host.state!.me })).ok,
       false,
     );
+    const remainingBeforePause = host.state!.game!.deadline! - Date.now();
     assert.ok((await host.cmd({ type: "pause" })).ok);
+    assert.equal(host.state!.paused, true);
+    assert.equal(host.state!.game!.deadline, null);
     const paused = host.state!.game!.version;
     const privateId = clients[2].state!.me;
     clients[2].socket.close();
@@ -552,6 +557,10 @@ test("packaged server: guest joins, creator-only rooms, scaled tables, privacy, 
       (candidate: { code: string }) => candidate.code === code,
     );
     assert.equal(storedRoom.mapSeed, selectedMapSeed);
+    assert.equal(storedRoom.paused, true);
+    assert.equal(storedRoom.game.deadline, null);
+    assert.ok(storedRoom.pausedRemainingMs <= remainingBeforePause);
+    assert.ok(storedRoom.pausedRemainingMs > remainingBeforePause - 2000);
     const storedGame = structuredClone(storedRoom.game);
     storedRoom.game.phase = "finished";
     storedRoom.game.winner = storedRoom.game.players[0].id;
@@ -601,6 +610,13 @@ test("packaged server: guest joins, creator-only rooms, scaled tables, privacy, 
     assert.equal(restored.state!.mapSeed, selectedMapSeed);
     assert.equal(restored.state!.game!.version, before.version);
     assert.deepEqual(restored.state!.game!.board, before.board);
+    assert.equal(restored.state!.paused, true);
+    assert.equal(restored.state!.game!.deadline, null);
+    assert.ok((await restored.cmd({ type: "pause" })).ok);
+    assert.equal(restored.state!.paused, false);
+    const resumedRemaining = restored.state!.game!.deadline! - Date.now();
+    assert.ok(resumedRemaining <= storedRoom.pausedRemainingMs + 200);
+    assert.ok(resumedRemaining > storedRoom.pausedRemainingMs - 1000);
     assert.ok((await restored.cmd({type:'close'})).ok);
     assert.ok((await restored.cmd({type:'create',name:'Clock test',password:key,options:{...DEFAULT_OPTIONS,timer:60,setupSettlementTimer:5,setupRoadTimer:5,actionTimer:10}})).ok);
     for(let i=0;i<3;i++)assert.ok((await restored.cmd({type:'bot'})).ok);
@@ -622,10 +638,18 @@ test("packaged server: guest joins, creator-only rooms, scaled tables, privacy, 
     assert.equal(restored.state!.game!.setupStep,timedSetupStep);
     assert.equal(restored.state!.game!.phase,'setupRoad');
     assert.ok(restored.state!.game!.deadline!>Date.now()+3000);
+    const setupRoadRemaining = restored.state!.game!.deadline! - Date.now();
     assert.ok((await restored.cmd({type:'pause'})).ok);
+    assert.equal(restored.state!.paused, true);
+    assert.equal(restored.state!.game!.deadline, null);
     const timerVersion=restored.state!.game!.version;
     await delay(200);
     assert.equal(restored.state!.game!.version,timerVersion);
+    assert.ok((await restored.cmd({type:'pause'})).ok);
+    assert.equal(restored.state!.paused, false);
+    const setupRoadResumed = restored.state!.game!.deadline! - Date.now();
+    assert.ok(setupRoadResumed <= setupRoadRemaining + 200);
+    assert.ok(setupRoadResumed > setupRoadRemaining - 1000);
     console.log('The short action timer advanced one expired placement and opened a fresh action window.');
     for (let i = 0; i < 150; i++) await restored.cmd({ type: "sync" });
     assert.equal((await restored.cmd({ type: "sync" })).ok, false);

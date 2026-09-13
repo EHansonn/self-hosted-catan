@@ -860,7 +860,7 @@ export function App() {
     setModal(null);
   };
   const phaseText = room?.paused
-    ? "Game paused"
+    ? `Game paused by ${room.players.find((player) => player.id === room.host)?.name || "host"}`
     : !game
       ? "Your next game starts here"
       : game.phase === "finished"
@@ -1795,6 +1795,18 @@ export function App() {
                   <div>
                     <strong>{phaseText}</strong>
                   </div>
+                  {host && (
+                    <button
+                      className={`btn subtle pause-game-btn ${room.paused ? "is-paused" : ""}`}
+                      disabled={pending || !connected}
+                      aria-pressed={room.paused}
+                      title={room.paused ? "Resume the game for everyone" : "Pause the game for everyone"}
+                      onClick={() => command({ type: "pause" })}
+                    >
+                      {room.paused ? <Play size={17} /> : <Pause size={17} />}
+                      <span>{room.paused ? "Resume" : "Pause"}</span>
+                    </button>
+                  )}
                   {myTurn && game.phase === "roll" && (
                     <button
                       className="btn primary roll-btn"
@@ -2622,6 +2634,7 @@ export function App() {
             <>
               <button
                 className="btn subtle"
+                disabled={pending || !connected}
                 onClick={() => command({ type: "pause" })}
               >
                 {room?.paused ? <Play size={17} /> : <Pause size={17} />}{" "}

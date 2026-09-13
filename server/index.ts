@@ -148,6 +148,7 @@ interface Room {
   disconnectedSince?: Record<string, number>;
   automaticTakeovers?: string[];
   paused?: boolean;
+  pausedRemainingMs?: number | null;
   matchId?: string;
   recordedMatchId?: string;
   leaderboardEligible?: boolean;
@@ -182,7 +183,28 @@ if (existsSync(storePath)) {
                 .map((player) => player.id)
             : [];
         r.game.resumeTime ??= null;
-        resetDeadline(r.game);
+        if (r.paused) {
+          const remaining = r.pausedRemainingMs;
+          if (
+            remaining !== null &&
+            !(
+              typeof remaining === "number" &&
+              Number.isFinite(remaining) &&
+              remaining >= 0
+            )
+          ) {
+            // Older saves did not store the frozen remainder. Give those rooms
+            // one fresh phase window, then freeze it until the host resumes.
+            resetDeadline(r.game);
+            r.pausedRemainingMs = r.game.deadline === null
+              ? null
+              : Math.max(0, r.game.deadline - Date.now());
+          }
+          r.game.deadline = null;
+        } else {
+          delete r.pausedRemainingMs;
+          resetDeadline(r.game);
+        }
         r.matchId ||= randomBytes(12).toString("hex");
         // Human session IDs never use the bot prefix, even if the host later
         // replaces that seat with a bot. This preserves start-of-game status
@@ -247,6 +269,23 @@ function save() {
     { mode: 0o600 },
   );
   renameSync(tmp, storePath);
+}
+function setRoomPaused(room: Room, paused: boolean) {
+  const game = room.game;
+  if (!game || !!room.paused === paused) return;
+  if (paused) {
+    room.pausedRemainingMs = game.deadline === null
+      ? null
+      : Math.max(0, game.deadline - Date.now());
+    game.deadline = null;
+    room.paused = true;
+    return;
+  }
+  const remaining = room.pausedRemainingMs;
+  room.paused = false;
+  delete room.pausedRemainingMs;
+  if (remaining === undefined) resetDeadline(game);
+  else game.deadline = remaining === null ? null : Date.now() + remaining;
 }
 if (prunedCompletedRooms) save();
 const buckets = new Map<string, { count: number; until: number }>();
@@ -963,7 +1002,7 @@ io.on("connection", (socket) => {
         socket.data.spectator = !seated;
         if (previousRoom && previousRoom.code !== r.code)
           attendanceChanged(previousRoom);
-        if (unattended) resetDeadline(r.game);
+        if (unattended && !r.paused) resetDeadline(r.game);
         attendanceChanged(r);
         return ack({ ok: true, spectator: !seated });
       }
@@ -1040,7 +1079,7 @@ io.on("connection", (socket) => {
             const unattended = seated && !hasHumanViewer(r);
             socket.data.room = r.code;
             socket.data.spectator = !seated;
-            if (unattended) resetDeadline(r.game);
+            if (unattended && !r.paused) resetDeadline(r.game);
             attendanceChanged(r);
             return ack({ ok: true, spectator: !seated });
           }
@@ -1079,7 +1118,7 @@ io.on("connection", (socket) => {
         const unattended = !!r.game && !hasHumanViewer(r);
         socket.data.room = r.code;
         socket.data.spectator = false;
-        if (r.game && unattended) resetDeadline(r.game);
+        if (r.game && unattended && !r.paused) resetDeadline(r.game);
         attendanceChanged(r);
         return ack({ ok: true });
       }
@@ -1289,8 +1328,14 @@ io.on("connection", (socket) => {
       if (command.type === "pause") {
         const r = needHost();
         if (!r.game) fail("No game to pause.");
-        r.paused = !r.paused;
-        if (!r.paused) resetDeadline(r.game);
+        const pausing = !r.paused;
+        setRoomPaused(r, pausing);
+        const hostPlayer = r.game.players.find((player) => player.id === r.host);
+        note(
+          r.game,
+          `${hostPlayer?.name || "The host"} ${pausing ? "paused" : "resumed"} the game.`,
+          "system",
+        );
         changed(r);
         return ack({ ok: true });
       }
@@ -1421,7 +1466,9 @@ const tick = setInterval(
           }
         }
       } catch (e) {
-        room.paused = true;
+        setRoomPaused(room, true);
+        room.updated = Date.now();
+        save();
         console.error(
           "Room paused after engine error",
           room.code,
