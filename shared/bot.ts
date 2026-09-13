@@ -176,10 +176,9 @@ export function chooseTimeoutAction(
     return player === undefined ? null : { type: "steal", player };
   }
   if (g.phase === "freeRoad") {
-    const id = randomItem(g, roadSites(g, p));
-    return id === undefined ? { type: "skipRoad" } : { type: "road", id };
+    return { type: "skipRoad" };
   }
-  return chooseBotAction(g, p);
+  return g.phase === "main" ? { type: "end" } : null;
 }
 export function chooseBotAction(g: Game, p: Player): Action | null {
   if (g.phase === "finished") return null;

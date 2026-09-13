@@ -851,6 +851,26 @@ test("expired required actions choose random legal fallbacks", () => {
   assert.equal(action?.type, "discard");
   if (action?.type === "discard") assert.equal(total(action.cards), 3);
 });
+test("a human turn timeout ends without spending cards or building", () => {
+  const game = setup(fresh());
+  game.phase = "main";
+  const player = game.players[game.current];
+  grant(game, player.id, { wood: 4, brick: 4, sheep: 4, wheat: 4, ore: 4 });
+  player.dev = [{ type: "knight", bought: game.turn - 1 }];
+
+  assert.ok(roadSites(game, player).length > 0);
+  assert.deepEqual(chooseTimeoutAction(game, player), { type: "end" });
+});
+test("a human free-road timeout skips instead of placing a road", () => {
+  const game = setup(fresh());
+  game.phase = "freeRoad";
+  game.resumePhase = "main";
+  game.freeRoads = 2;
+  const player = game.players[game.current];
+
+  assert.ok(roadSites(game, player).length > 0);
+  assert.deepEqual(chooseTimeoutAction(game, player), { type: "skipRoad" });
+});
 test("expired discards preserve selected cards and fill only the remainder", () => {
   const game = fresh();
   game.phase = "discard";
