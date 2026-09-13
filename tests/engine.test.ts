@@ -27,6 +27,7 @@ import {
   canResumeRoom,
   toggleSpecialBuildRequest,
   hasSpecialBuildAction,
+  expirePlayerTrade,
 } from "../shared/game";
 import { chooseBotAction, chooseTimeoutAction } from "../shared/bot";
 const fresh = (n = 4, seed = 22, difficulty: Difficulty = "normal") =>
@@ -508,6 +509,44 @@ test("trade creators choose among approving players before cards move", () => {
   assert.equal(g.players[0].resources.wood, beforeApproval[0].wood - 1);
   assert.equal(g.players[0].resources.ore, beforeApproval[0].ore + 1);
   assert.throws(() => applyAction(g, "p1", { type: "accept", offerId }));
+  invariant(g);
+});
+test("player trades pause the turn clock and restore a minimum action window", () => {
+  let g = setup(fresh());
+  g.phase = "main";
+  g.options.tradeTimer = 30;
+  g.options.postTradeTimer = 15;
+  grant(g, "p0", { wood: 2 });
+  const give = { ...emptyHand(), wood: 1 };
+  const want = { ...emptyHand(), ore: 1 };
+  g.deadline = Date.now() + 5_000;
+
+  g = applyAction(g, "p0", { type: "offer", give, want });
+  assert.ok(g.offer);
+  assert.ok(g.resumeTime! > 4_000 && g.resumeTime! <= 5_000);
+  assert.ok(g.deadline! > Date.now() + 28_000);
+  assert.ok(g.deadline! <= Date.now() + 30_000);
+  assert.throws(
+    () => applyAction(g, "p0", { type: "end" }),
+    /open trade/,
+  );
+
+  const offerId = g.offer.id;
+  g = applyAction(g, "p1", { type: "reject", offerId });
+  g = applyAction(g, "p2", { type: "reject", offerId });
+  assert.ok(g.offer);
+  g = applyAction(g, "p3", { type: "reject", offerId });
+  assert.equal(g.offer, null);
+  assert.equal(g.resumeTime, null);
+  assert.ok(g.deadline! > Date.now() + 14_000);
+  assert.ok(g.deadline! <= Date.now() + 15_000);
+
+  g.deadline = Date.now() + 3_000;
+  g = applyAction(g, "p0", { type: "offer", give, want });
+  g = expirePlayerTrade(g);
+  assert.equal(g.offer, null);
+  assert.ok(g.deadline! > Date.now() + 14_000);
+  assert.match(g.log.at(-1)?.text || "", /trade offer expires/);
   invariant(g);
 });
 test("development card age, one per turn, two matching plenty cards and monopoly", () => {

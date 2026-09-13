@@ -37,6 +37,7 @@ import {
   publicPlayer,
   viewGame,
   resetDeadline,
+  expirePlayerTrade,
   canResumeRoom,
 } from "../shared/game";
 import { chooseBotAction, chooseTimeoutAction } from "../shared/bot";
@@ -541,6 +542,25 @@ const optionsSchema = z.object({
     z.literal(360),
   ]),
   turnActionBonus: z.union([
+    z.literal(0),
+    z.literal(5),
+    z.literal(10),
+    z.literal(15),
+    z.literal(20),
+    z.literal(30),
+    z.literal(60),
+  ]).default(15),
+  tradeTimer: z.union([
+    z.literal(0),
+    z.literal(10),
+    z.literal(15),
+    z.literal(20),
+    z.literal(30),
+    z.literal(45),
+    z.literal(60),
+    z.literal(90),
+  ]).default(30),
+  postTradeTimer: z.union([
     z.literal(0),
     z.literal(5),
     z.literal(10),
@@ -1477,6 +1497,11 @@ const tick = setInterval(
         continue;
       try {
         if (g.deadline && Date.now() > g.deadline) {
+          if (g.phase === "main" && g.offer) {
+            room.game = expirePlayerTrade(g);
+            changed(room);
+            continue;
+          }
           if (g.phase === "discard") {
             for (const p of g.players) {
               if (g.discards[p.id]) {

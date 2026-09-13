@@ -230,7 +230,15 @@ const actionClockLabels: Partial<Record<Phase, string>> = {
   steal: "choose a player",
   freeRoad: "place a free road",
 };
-function Clock({ deadline, phase }: { deadline: number | null; phase: Phase }) {
+function Clock({
+  deadline,
+  phase,
+  tradeOpen = false,
+}: {
+  deadline: number | null;
+  phase: Phase;
+  tradeOpen?: boolean;
+}) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     if (!deadline) return;
@@ -242,7 +250,7 @@ function Clock({ deadline, phase }: { deadline: number | null; phase: Phase }) {
   const minutes = Math.floor(remaining / 60);
   const seconds = remaining % 60;
   const display = `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-  const actionLabel = actionClockLabels[phase];
+  const actionLabel = tradeOpen ? "finish the trade" : actionClockLabels[phase];
   const urgentAt = actionLabel ? 3 : 10;
   const warningAt = actionLabel ? 5 : 30;
   return (
@@ -599,6 +607,7 @@ export function App() {
       }
       if (previous?.game?.version !== r?.game?.version || r?.paused)
         setSelection(null);
+      if (previous?.game?.offer?.id !== r?.game?.offer?.id) setBuild(null);
       if (
         previous?.game?.turn !== r?.game?.turn ||
         previous?.game?.phase !== r?.game?.phase
@@ -880,6 +889,7 @@ export function App() {
     !!game &&
     myTurn &&
     game.phase === "main" &&
+    !game.offer &&
     !room?.paused &&
     connected &&
     !pending;
@@ -901,6 +911,10 @@ export function App() {
       ? "Your next game starts here"
       : game.phase === "finished"
         ? `${game.players.find((p) => p.id === game.winner)?.name} wins`
+        : game.offer
+          ? game.offer.from === room!.me
+            ? "Your trade offer is open"
+            : `${game.players.find((player) => player.id === game.offer?.from)?.name || "Player"}'s trade offer is open`
         : game.phase === "discard"
           ? game.discards[room!.me]
             ? `Discard ${game.discards[room!.me]} cards`
@@ -1469,6 +1483,35 @@ export function App() {
             <option value={60}>+60 seconds</option>
           </LabelSelect>
           <LabelSelect
+            label="Player trade timer"
+            value={room.options.tradeTimer ?? DEFAULT_OPTIONS.tradeTimer}
+            disabled={!host || pending}
+            onChange={(value) => updateRoomOptions({ tradeTimer: Number(value) as Options["tradeTimer"] })}
+          >
+            <option value={0}>No trade limit</option>
+            <option value={10}>10 seconds</option>
+            <option value={15}>15 seconds</option>
+            <option value={20}>20 seconds</option>
+            <option value={30}>30 seconds</option>
+            <option value={45}>45 seconds</option>
+            <option value={60}>60 seconds</option>
+            <option value={90}>90 seconds</option>
+          </LabelSelect>
+          <LabelSelect
+            label="Minimum time after a trade"
+            value={room.options.postTradeTimer ?? DEFAULT_OPTIONS.postTradeTimer}
+            disabled={!host || pending}
+            onChange={(value) => updateRoomOptions({ postTradeTimer: Number(value) as Options["postTradeTimer"] })}
+          >
+            <option value={0}>No minimum</option>
+            <option value={5}>At least 5 seconds</option>
+            <option value={10}>At least 10 seconds</option>
+            <option value={15}>At least 15 seconds</option>
+            <option value={20}>At least 20 seconds</option>
+            <option value={30}>At least 30 seconds</option>
+            <option value={60}>At least 60 seconds</option>
+          </LabelSelect>
+          <LabelSelect
             label="Opening settlement timer"
             value={room.options.setupSettlementTimer ?? DEFAULT_OPTIONS.setupSettlementTimer}
             disabled={!host || pending}
@@ -1849,7 +1892,8 @@ export function App() {
                         : `Build ${selection.type}`,
                     onConfirm: confirmPlacement,
                     onCancel: () => setSelection(null),
-                    disabled: pending || !connected || !!room?.paused,
+                    disabled:
+                      pending || !connected || !!room?.paused || !!game.offer,
                   }
                 : undefined
             }
@@ -1897,6 +1941,7 @@ export function App() {
                     key={game.deadline ?? "untimed"}
                     deadline={game.deadline}
                     phase={game.phase}
+                    tradeOpen={!!game.offer}
                   />
                 )}
               </div>
@@ -2459,6 +2504,7 @@ export function App() {
                         pending ||
                         !connected ||
                         room?.paused ||
+                        !!game?.offer ||
                         me.playedDev ||
                         d.bought === game?.turn ||
                         !["roll", "main"].includes(game?.phase || "")
@@ -2548,6 +2594,7 @@ export function App() {
                   pending ||
                   !connected ||
                   room?.paused ||
+                  !!game?.offer ||
                   me?.playedDev ||
                   !["roll", "main"].includes(game?.phase || "")
                 }
@@ -2586,6 +2633,14 @@ export function App() {
                 {(room.options.turnActionBonus ?? DEFAULT_OPTIONS.turnActionBonus)
                   ? `+${room.options.turnActionBonus ?? DEFAULT_OPTIONS.turnActionBonus}s after builds/cards`
                   : "No action time bonus"}
+                {" · "}
+                {(room.options.tradeTimer ?? DEFAULT_OPTIONS.tradeTimer)
+                  ? `${room.options.tradeTimer ?? DEFAULT_OPTIONS.tradeTimer}s player trades`
+                  : "Untimed player trades"}
+                {" · "}
+                {(room.options.postTradeTimer ?? DEFAULT_OPTIONS.postTradeTimer)
+                  ? `at least ${room.options.postTradeTimer ?? DEFAULT_OPTIONS.postTradeTimer}s after trades`
+                  : "No post-trade minimum"}
                 {" · "}
                 {(room.options.setupSettlementTimer ?? DEFAULT_OPTIONS.setupSettlementTimer)
                   ? `${room.options.setupSettlementTimer ?? DEFAULT_OPTIONS.setupSettlementTimer}s opening settlements`

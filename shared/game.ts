@@ -107,6 +107,8 @@ export interface Options {
   difficulty: Difficulty;
   timer: number;
   turnActionBonus: number;
+  tradeTimer: number;
+  postTradeTimer: number;
   setupSettlementTimer: number;
   setupRoadTimer: number;
   robberTimer: number;
@@ -123,6 +125,8 @@ export const DEFAULT_OPTIONS: Options = {
   difficulty: "normal",
   timer: 60,
   turnActionBonus: 15,
+  tradeTimer: 30,
+  postTradeTimer: 15,
   setupSettlementTimer: 120,
   setupRoadTimer: 20,
   robberTimer: 20,
@@ -710,7 +714,10 @@ export function phaseTimerSeconds(options: Options, phase: Phase) {
   return options.actionTimer ?? DEFAULT_OPTIONS.actionTimer;
 }
 export function resetDeadline(g: Game) {
-  const seconds = phaseTimerSeconds(g.options, g.phase);
+  const seconds =
+    g.phase === "main" && g.offer
+      ? (g.options.tradeTimer ?? DEFAULT_OPTIONS.tradeTimer)
+      : phaseTimerSeconds(g.options, g.phase);
   g.deadline = seconds ? Date.now() + seconds * 1000 : null;
 }
 function preserveDeadline(g: Game) {
@@ -725,6 +732,14 @@ function restoreDeadline(g: Game) {
     ? null
     : Date.now() + remaining;
   if (remaining === null) resetDeadline(g);
+}
+function finishPlayerTrade(g: Game) {
+  const minimum =
+    (g.options.postTradeTimer ?? DEFAULT_OPTIONS.postTradeTimer) * 1000;
+  if (minimum && g.resumeTime !== null)
+    g.resumeTime = Math.max(g.resumeTime, minimum);
+  g.offer = null;
+  restoreDeadline(g);
 }
 function ensure(ok: unknown, message: string): asserts ok {
   if (!ok) throw new Error(message);
@@ -1068,7 +1083,16 @@ function settlePlayerTrade(g: Game, offer: Offer, recipient: Player) {
     recipient.resources[resource] += offer.give[resource] - offer.want[resource];
   });
   note(g, `${recipient.name} trades with ${from.name}.`, "trade");
-  g.offer = null;
+  finishPlayerTrade(g);
+}
+export function expirePlayerTrade(game: Game): Game {
+  const g = structuredClone(game);
+  ensure(g.phase === "main" && g.offer, "There is no player trade to expire.");
+  const from = g.players.find((player) => player.id === g.offer!.from)!;
+  note(g, `${from.name}'s trade offer expires.`, "trade");
+  finishPlayerTrade(g);
+  g.version++;
+  return g;
 }
 export function bankTradeUnits(give: Hand, rates: Hand) {
   if (!handValid(give)) return null;
@@ -1172,7 +1196,7 @@ function mutate(g: Game, id: string, a: Action) {
   if (a.type === "cancelTrade") {
     ensure(g.phase === "main" && !g.secondary && g.offer &&
       (g.offer.from === id || g.players[g.current].id === id), "You cannot cancel that offer.");
-    g.offer = null;
+    finishPlayerTrade(g);
     return;
   }
   if (a.type === "counter") {
@@ -1186,6 +1210,7 @@ function mutate(g: Game, id: string, a: Action) {
       RESOURCES.every(r => !a.give[r] || !a.want[r]), "Offer and request different resources.");
     ensure(canPay(p, a.give), "You do not have the offered cards.");
     g.offer = { id: g.version + 1, from: id, to: editingOwnCounter ? offer.to : offer.from, give: a.give, want: a.want, approved: [], rejected: [] };
+    resetDeadline(g);
     note(g, `${p.name} makes a counteroffer.`, "trade");
     return;
   }
@@ -1215,6 +1240,14 @@ function mutate(g: Game, id: string, a: Action) {
     if (a.type === "reject") {
       offer.approved = offer.approved.filter((playerId) => playerId !== id);
       if (!offer.rejected.includes(id)) offer.rejected.push(id);
+      const responders = g.players.filter(
+        (player) =>
+          player.id !== offer.from && (!offer.to || player.id === offer.to),
+      );
+      if (responders.every((player) => offer.rejected.includes(player.id))) {
+        note(g, `Everyone declines ${g.players.find((player) => player.id === offer.from)!.name}'s trade offer.`, "trade");
+        finishPlayerTrade(g);
+      }
       return;
     }
     const from = g.players.find((x) => x.id === offer.from)!;
@@ -1232,6 +1265,7 @@ function mutate(g: Game, id: string, a: Action) {
     return;
   }
   ensure(g.players[g.current].id === id, "It's another player's turn.");
+  ensure(!g.offer || a.type === "offer", "Finish the open trade first.");
   if (a.type === "settlement") {
     const setup = g.phase === "setupSettlement";
     ensure(setup || g.phase === "main", "You cannot build a settlement now.");
@@ -1483,6 +1517,8 @@ function mutate(g: Game, id: string, a: Action) {
       "Offer and request different resources.",
     );
     ensure(canPay(p, a.give), "You do not have the offered cards.");
+    ensure(!g.offer || g.offer.from === id, "Respond to the open trade first.");
+    if (!g.offer) preserveDeadline(g);
     g.offer = {
       id: g.version + 1,
       from: id,
@@ -1491,6 +1527,7 @@ function mutate(g: Game, id: string, a: Action) {
       approved: [],
       rejected: [],
     };
+    resetDeadline(g);
     note(g, `${p.name} offers a trade.`, "trade");
     return;
   }
