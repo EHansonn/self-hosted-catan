@@ -25,6 +25,7 @@ import {
   MAX_BOARD_ZOOM,
   MIN_BOARD_ZOOM,
   boardPanPosition,
+  boardPinchAnchor,
   boardPinchZoom,
   boardWheelZoom,
   boardZoomAnchor,
@@ -416,7 +417,13 @@ export function BoardView(props: BoardProps) {
   const zoomAnchor = useRef<BoardZoomAnchor | null>(null);
   const panOrigin = useRef<BoardPanOrigin | null>(null);
   const touchPoints = useRef(new Map<number, { x: number; y: number }>());
-  const pinchOrigin = useRef<{ distance: number; zoom: number } | null>(null);
+  const pinchOrigin = useRef<{
+    distance: number;
+    zoom: number;
+    anchorX: number;
+    anchorY: number;
+  } | null>(null);
+  const pinchFrame = useRef<number | null>(null);
   const touchGestureMoved = useRef(false);
   const suppressClickUntil = useRef(0);
   const hintedSites = buildHint ? props.buildOptions?.[buildHint] : undefined;
@@ -483,6 +490,49 @@ export function BoardView(props: BoardProps) {
   const canPan = (viewport: HTMLDivElement) =>
     viewport.scrollWidth > viewport.clientWidth + 1 ||
     viewport.scrollHeight > viewport.clientHeight + 1;
+  const queuePinchFrame = () => {
+    if (pinchFrame.current !== null) return;
+    pinchFrame.current = requestAnimationFrame(() => {
+      pinchFrame.current = null;
+      const viewport = boardScroll.current;
+      const pinch = pinchOrigin.current;
+      if (!viewport || !pinch || touchPoints.current.size < 2) return;
+      const [first, second] = [...touchPoints.current.values()];
+      const nextZoom = boardPinchZoom(
+        pinch.zoom,
+        pinch.distance,
+        Math.hypot(second.x - first.x, second.y - first.y),
+      );
+      const bounds = viewport.getBoundingClientRect();
+      const focus = {
+        x: (first.x + second.x) / 2 - bounds.left,
+        y: (first.y + second.y) / 2 - bounds.top,
+      };
+      const anchor = {
+        x: pinch.anchorX,
+        y: pinch.anchorY,
+        viewportX: Math.max(0, Math.min(viewport.clientWidth, focus.x)),
+        viewportY: Math.max(0, Math.min(viewport.clientHeight, focus.y)),
+      };
+      if (nextZoom === zoomRef.current) {
+        viewport.scrollLeft =
+          anchor.x * viewport.scrollWidth - anchor.viewportX;
+        viewport.scrollTop =
+          anchor.y * viewport.scrollHeight - anchor.viewportY;
+      } else {
+        zoomAnchor.current = anchor;
+        zoomRef.current = nextZoom;
+        setZoom(nextZoom);
+      }
+    });
+  };
+  useEffect(
+    () => () => {
+      if (pinchFrame.current !== null)
+        cancelAnimationFrame(pinchFrame.current);
+    },
+    [],
+  );
   const beginPan = (event: React.PointerEvent<HTMLDivElement>) => {
     const viewport = boardScroll.current;
     if (!viewport) return;
@@ -496,9 +546,17 @@ export function BoardView(props: BoardProps) {
         if (!canPan(viewport)) return;
       } else if (touchPoints.current.size === 2) {
         const [first, second] = [...touchPoints.current.values()];
+        const bounds = viewport.getBoundingClientRect();
+        const focus = {
+          x: (first.x + second.x) / 2 - bounds.left,
+          y: (first.y + second.y) / 2 - bounds.top,
+        };
+        const anchor = boardPinchAnchor(viewport, zoomRef.current, focus);
         pinchOrigin.current = {
           distance: Math.hypot(second.x - first.x, second.y - first.y),
           zoom: zoomRef.current,
+          anchorX: anchor.x,
+          anchorY: anchor.y,
         };
         panOrigin.current = null;
         touchGestureMoved.current = true;
@@ -529,26 +587,31 @@ export function BoardView(props: BoardProps) {
   const movePan = (event: React.PointerEvent<HTMLDivElement>) => {
     const viewport = boardScroll.current;
     if (viewport && event.pointerType === "touch") {
-      if (!touchPoints.current.has(event.pointerId)) return;
+      const previousTouch = touchPoints.current.get(event.pointerId);
+      if (!previousTouch) return;
       touchPoints.current.set(event.pointerId, {
         x: event.clientX,
         y: event.clientY,
       });
       const pinch = pinchOrigin.current;
       if (pinch && touchPoints.current.size >= 2) {
-        const [first, second] = [...touchPoints.current.values()];
-        const nextZoom = boardPinchZoom(
-          pinch.zoom,
-          pinch.distance,
-          Math.hypot(second.x - first.x, second.y - first.y),
-        );
-        const bounds = viewport.getBoundingClientRect();
-        setBoardZoom(nextZoom, {
-          x: (first.x + second.x) / 2 - bounds.left,
-          y: (first.y + second.y) / 2 - bounds.top,
-        });
+        queuePinchFrame();
         event.preventDefault();
         return;
+      }
+      if (
+        touchPoints.current.size === 1 &&
+        !panOrigin.current &&
+        canPan(viewport)
+      ) {
+        panOrigin.current = {
+          pointerId: event.pointerId,
+          x: previousTouch.x,
+          y: previousTouch.y,
+          scrollLeft: viewport.scrollLeft,
+          scrollTop: viewport.scrollTop,
+          moved: false,
+        };
       }
     }
     const origin = panOrigin.current;
@@ -572,18 +635,9 @@ export function BoardView(props: BoardProps) {
       if (pinchOrigin.current) {
         pinchOrigin.current = null;
         suppressClickUntil.current = performance.now() + 350;
-        const remaining = [...touchPoints.current.entries()][0];
-        panOrigin.current =
-          viewport && remaining && canPan(viewport)
-            ? {
-                pointerId: remaining[0],
-                x: remaining[1].x,
-                y: remaining[1].y,
-                scrollLeft: viewport.scrollLeft,
-                scrollTop: viewport.scrollTop,
-                moved: false,
-              }
-            : null;
+        // Start one-finger panning lazily on its next movement, after the final
+        // pinch layout and anchored scroll position have both been applied.
+        panOrigin.current = null;
         setPanning(false);
       }
       if (touchPoints.current.size === 0) {

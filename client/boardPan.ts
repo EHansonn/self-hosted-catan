@@ -47,6 +47,36 @@ export function boardPinchZoom(
   );
 }
 
+export function boardPinchAnchor(
+  viewport: {
+    scrollLeft: number;
+    scrollTop: number;
+    clientWidth: number;
+    clientHeight: number;
+    scrollWidth: number;
+    scrollHeight: number;
+  },
+  currentZoom: number,
+  focus: { x: number; y: number },
+) {
+  const x =
+    currentZoom <= 1
+      ? 0.5 +
+        (focus.x - viewport.clientWidth / 2) /
+          Math.max(viewport.clientWidth * currentZoom, 1)
+      : (viewport.scrollLeft + focus.x) / Math.max(viewport.scrollWidth, 1);
+  const y =
+    currentZoom <= 1
+      ? 0.5 +
+        (focus.y - viewport.clientHeight / 2) /
+          Math.max(viewport.clientHeight * currentZoom, 1)
+      : (viewport.scrollTop + focus.y) / Math.max(viewport.scrollHeight, 1);
+  return {
+    x: Math.max(0, Math.min(1, x)),
+    y: Math.max(0, Math.min(1, y)),
+  };
+}
+
 export interface BoardZoomAnchor {
   x: number;
   y: number;

@@ -6,6 +6,7 @@ import {
   MAX_BOARD_ZOOM,
   MIN_BOARD_ZOOM,
   boardPanPosition,
+  boardPinchAnchor,
   boardPinchZoom,
   boardWheelZoom,
   boardZoomAnchor,
@@ -89,6 +90,29 @@ test("pinch distance zooms proportionally and stays within bounds", () => {
   assert.equal(boardPinchZoom(1, 100, 1_000), MAX_BOARD_ZOOM);
   assert.equal(boardPinchZoom(1, 100, 1), MIN_BOARD_ZOOM);
   assert.equal(boardPinchZoom(1.2, 0, 200), 1.2);
+});
+
+test("pinch keeps one fixed board point under the gesture midpoint", () => {
+  const viewport = {
+    scrollLeft: 300,
+    scrollTop: 200,
+    clientWidth: 1_000,
+    clientHeight: 700,
+    scrollWidth: 2_000,
+    scrollHeight: 1_400,
+  };
+  assert.deepEqual(boardPinchAnchor(viewport, 1.5, { x: 250, y: 175 }), {
+    x: 0.275,
+    y: 0.26785714285714285,
+  });
+  assert.deepEqual(
+    boardPinchAnchor(
+      { ...viewport, scrollLeft: 0, scrollTop: 0, scrollWidth: 1_000, scrollHeight: 700 },
+      0.8,
+      { x: 500, y: 350 },
+    ),
+    { x: 0.5, y: 0.5 },
+  );
 });
 
 test("wheel zoom preserves the hovered board point while enlarged", () => {
