@@ -210,24 +210,66 @@ export function OfferPanel({ offer, players, me, enabled, act, onEdit }: { offer
   const broadcast = !offer.to;
   const approvedByMe = offer.approved.includes(me);
   const responders = players.filter(p => p.id !== offer.from && (!offer.to || p.id === offer.to));
+  if (mine) return <section className="offer-panel offer-panel-owner" aria-label="Your trade offer">
+    <div className="offer-owner-heading cream-tray">
+      <div className="offer-owner-audience" aria-label="Players considering your offer">
+        {responders.map(p => {
+          const status = offer.approved.includes(p.id) ? "accepted" : offer.rejected.includes(p.id) ? "declined" : "waiting";
+          return <span className={`offer-owner-avatar is-${status}`} key={p.id} title={`${p.name}: ${status}`}>
+            <Avatar player={p} />
+          </span>;
+        })}
+      </div>
+    </div>
+    <div className="offer-owner-body cream-tray">
+      <div className="offer-owner-lines">
+        <div className="trade-line receiving"><Sprite name="people" /><ArrowDown className="trade-arrow" /><CardRow hand={offer.give} label="Resources they receive" /></div>
+        <div className="trade-line giving"><Avatar player={from} /><ArrowUp className="trade-arrow" /><CardRow hand={offer.want} label="Resources you receive" /></div>
+      </div>
+      <div className="offer-owner-side">
+        <div className="offer-owner-response-rail" aria-label="Player responses">
+          {responders.map(p => {
+            const approved = offer.approved.includes(p.id);
+            const rejected = offer.rejected.includes(p.id);
+            const status = approved ? "accepted" : rejected ? "declined" : "waiting";
+            const canChoose = approved && broadcast;
+            const label = canChoose ? `Trade with ${p.name}` : `${p.name}: ${status}`;
+            return <button
+              className={`offer-response-tile is-${status}`}
+              style={{ "--player": p.color } as CSSProperties}
+              type="button"
+              key={p.id}
+              disabled={!enabled || !canChoose}
+              aria-label={label}
+              title={label}
+              onClick={() => canChoose && act({ type: "accept", offerId: offer.id, player: p.id })}
+            >
+              {approved ? <Check /> : rejected ? <X /> : <span aria-hidden="true">…</span>}
+            </button>;
+          })}
+        </div>
+        <div className="offer-actions offer-owner-controls">
+          <ActionTile label="Edit offer" disabled={!enabled} onClick={onEdit}><Pencil /></ActionTile>
+          <ActionTile label="Cancel offer" disabled={!enabled} onClick={() => act({ type: "cancelTrade" })}><X /></ActionTile>
+        </div>
+      </div>
+    </div>
+  </section>;
   return <section className="offer-panel" aria-label={`${from.name}'s trade offer`}>
-    <div className="offer-heading cream-tray"><Avatar player={from} /><span>{mine ? "Your offer" : `${from.name} offers`}</span><div className="offer-responses">{responders.map(p => {
+    <div className="offer-heading cream-tray"><Avatar player={from} /><span>{from.name} offers</span><div className="offer-responses">{responders.map(p => {
       const approved = offer.approved.includes(p.id);
-      return <span key={p.id}><Avatar player={p} />{approved && mine && broadcast
-        ? <button className="offer-approval-choice" type="button" disabled={!enabled} aria-label={`Trade with ${p.name}`} title={`Trade with ${p.name}`} onClick={() => act({ type: "accept", offerId: offer.id, player: p.id })}><Check /></button>
-        : approved
+      return <span key={p.id}><Avatar player={p} />{approved
           ? <Check className="offer-approved" aria-label={`${p.name} approved`} />
           : offer.rejected.includes(p.id) && <X className="offer-declined" aria-label={`${p.name} declined`} />}</span>;
     })}</div></div>
     <div className="offer-body cream-tray">
       <div className="trade-line receiving"><Avatar player={from} /><ArrowDown className="trade-arrow" /><CardRow hand={offer.give} label="Offered resources" /></div>
       <div className="trade-line giving"><Sprite name="people" /><ArrowUp className="trade-arrow" /><CardRow hand={offer.want} label="Requested resources" /></div>
-      {mine && broadcast && <p className="offer-guidance">{offer.approved.length ? "Choose who to trade with by clicking their green checkmark." : "Waiting for players to approve your offer."}</p>}
-      {!mine && broadcast && approvedByMe && <p className="offer-guidance">Approved — waiting for {from.name} to choose.</p>}
+      {broadcast && approvedByMe && <p className="offer-guidance">Approved — waiting for {from.name} to choose.</p>}
       {canRespond && !canPay && <p className="offer-guidance offer-unavailable">You cannot accept this trade. You are missing {missingCards.join(", ")}.</p>}
       <div className="offer-actions">
-        {(mine || canRespond) && <ActionTile label={mine ? "Edit offer" : "Edit counteroffer"} disabled={!enabled} onClick={onEdit}><Pencil /></ActionTile>}
-        {(mine || canRespond) && <ActionTile label={mine ? "Cancel offer" : "Reject offer"} disabled={!enabled} onClick={() => act(mine ? { type: "cancelTrade" } : { type: "reject", offerId: offer.id })}><X /></ActionTile>}
+        {canRespond && <ActionTile label="Edit counteroffer" disabled={!enabled} onClick={onEdit}><Pencil /></ActionTile>}
+        {canRespond && <ActionTile label="Reject offer" disabled={!enabled} onClick={() => act({ type: "reject", offerId: offer.id })}><X /></ActionTile>}
         {canRespond && <ActionTile label={!canPay ? `Cannot accept; missing ${missingCards.join(", ")}` : broadcast ? approvedByMe ? "Offer approved" : "Approve offer" : "Accept counteroffer"} disabled={!enabled || !canPay || (broadcast && approvedByMe)} onClick={() => act({ type: "accept", offerId: offer.id })}><Check /></ActionTile>}
       </div>
     </div>

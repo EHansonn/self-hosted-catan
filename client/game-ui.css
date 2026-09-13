@@ -109,9 +109,40 @@ button.game-card:disabled { opacity: .42; }
 .trade-line-label,.trade-line-empty { display: none; }
 .trade-rail { grid-column: 2; grid-row: 2; display: flex; flex-direction: column; justify-content: flex-end; gap: 10px; }.trade-rail .action-tile { flex: 0 0 auto; width: 100%; aspect-ratio: 1; }.trade-status { grid-column: 1 / -1; color: #fff; font-size: 12px; line-height: 17px; margin: 0; text-shadow: 0 1px 2px #124761; }
 .trade-action-copy { display: none; }
-.offer-panel { position: absolute; z-index: 7; right: 8px; top: 53px; width: min(405px,calc(100% - 16px)); --card-width: 39px; }.offer-heading { display: flex; align-items: center; gap: 9px; padding: 7px 10px; margin-bottom: 5px; font-size: 14px; }.offer-heading > .avatar-badge { width: 37px; height: 37px; }.offer-responses { display: flex; gap: 6px; margin-left: auto; }.offer-responses > span { position: relative; }.offer-responses .avatar-badge { width: 29px; height: 29px; }.offer-responses > span > svg { position: absolute; bottom: -1px; right: -3px; border-radius: 50%; width: 15px; height: 15px; background: #e35e4d; color: #fff; border: 1px solid #fff; }.offer-responses .offer-approved { background: #20a956; }.offer-approval-choice { position: absolute; right: -5px; bottom: -3px; display: grid; place-items: center; width: 22px; height: 22px; padding: 0; border: 1px solid #fff; border-radius: 50%; background: #20a956; color: #fff; box-shadow: 0 0 0 2px #43d37a66,0 2px 3px #163f2b88; cursor: pointer; }.offer-approval-choice:hover:not(:disabled) { transform: scale(1.14); background: #2fc66b; }.offer-approval-choice:focus-visible { outline: 3px solid #ffd05d; outline-offset: 2px; }.offer-approval-choice:disabled { cursor: wait; opacity: .65; }.offer-approval-choice svg { position: static; width: 15px; height: 15px; border: 0; background: transparent; }.offer-guidance { margin: -3px 0 0; color: #426272; font-size: 12px; font-weight: 700; line-height: 1.35; }
+.offer-panel { position: absolute; z-index: 7; right: 8px; top: 53px; width: min(405px,calc(100% - 16px)); --card-width: 39px; }
+.offer-heading { display: flex; align-items: center; gap: 9px; padding: 7px 10px; margin-bottom: 5px; font-size: 14px; }
+.offer-heading > .avatar-badge { width: 37px; height: 37px; }
+.offer-responses { display: flex; gap: 6px; margin-left: auto; }
+.offer-responses > span { position: relative; }
+.offer-responses .avatar-badge { width: 29px; height: 29px; }
+.offer-responses > span > svg { position: absolute; bottom: -1px; right: -3px; border-radius: 50%; width: 15px; height: 15px; background: #e35e4d; color: #fff; border: 1px solid #fff; }
+.offer-responses .offer-approved { background: #20a956; }
+.offer-guidance { margin: -3px 0 0; color: #426272; font-size: 12px; font-weight: 700; line-height: 1.35; }
 .offer-guidance.offer-unavailable { color: #a33a2c; }
 .offer-body { position: relative; padding: 10px; display: grid; gap: 12px; }.offer-body .trade-line { padding-right: 0; }.offer-body .trade-line > .avatar-badge,.offer-body .trade-line > .game-sprite { width: 37px; height: 37px; }.offer-actions { display: flex; gap: 7px; justify-content: flex-end; }.offer-actions .action-tile { width: 48px; height: 48px; flex: 0 0 auto; border-width: 3px; border-radius: 8px; padding: 5px; }
+.offer-panel-owner { width: min(560px,calc(100% - 16px)); }
+.offer-owner-heading { display: flex; align-items: center; justify-content: center; min-height: 57px; padding: 7px 58px; margin-bottom: 5px; }
+.offer-owner-audience { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 10px; }
+.offer-owner-avatar { display: inline-flex; position: relative; border-radius: 50%; }
+.offer-owner-avatar .avatar-badge { width: 39px; height: 39px; }
+.offer-owner-avatar.is-accepted { filter: drop-shadow(0 0 4px #31c66d); }
+.offer-owner-avatar.is-declined { opacity: .62; filter: grayscale(.25); }
+.offer-owner-body { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: center; gap: 14px; min-height: 165px; padding: 12px; }
+.offer-owner-lines { display: grid; align-content: center; gap: 16px; min-width: 0; }
+.offer-owner-lines .trade-line { min-height: 57px; }
+.offer-owner-lines .trade-line > .avatar-badge,.offer-owner-lines .trade-line > .game-sprite { width: 43px; height: 43px; }
+.offer-owner-side { display: grid; align-content: center; justify-items: end; gap: 12px; min-width: 0; }
+.offer-owner-response-rail { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 7px; max-width: 238px; }
+.offer-response-tile { display: grid; place-items: center; flex: 0 0 auto; width: 52px; height: 52px; padding: 7px; border: 4px solid #fff; border-radius: 9px; background: linear-gradient(color-mix(in srgb,var(--player) 88%,#fff),color-mix(in srgb,var(--player) 78%,#19394a)); box-shadow: 0 3px 0 color-mix(in srgb,var(--player) 55%,#536c91),inset 0 0 0 1px #ffffff66; color: #fff; text-shadow: 0 1px 2px #17313e; }
+.offer-response-tile > svg { width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 3.5; filter: drop-shadow(1px 1px 0 #183c4d) drop-shadow(-1px -1px 0 #183c4d); }
+.offer-response-tile > span { font: 900 28px/1 Arial,sans-serif; transform: translateY(-5px); }
+.offer-response-tile.is-accepted:not(:disabled) { cursor: pointer; }
+.offer-response-tile.is-accepted:not(:disabled):hover { filter: brightness(1.12); transform: translateY(-2px); }
+.offer-response-tile.is-accepted:not(:disabled):active { transform: translateY(1px); box-shadow: 0 1px 0 color-mix(in srgb,var(--player) 55%,#536c91); }
+.offer-response-tile.is-declined { opacity: .66; }
+.offer-response-tile.is-waiting { opacity: .55; }
+.offer-response-tile:focus-visible { outline: 3px solid #ffd05d; outline-offset: 2px; }
+.offer-owner-controls .action-tile { width: 42px; height: 42px; padding: 6px; border-radius: 8px; }
 .steal-panel { position: absolute; z-index: 8; bottom: 35px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 14px; padding: 12px; }.steal-panel h3 { font-size: 16px; white-space: nowrap; }.victim-choice { display: flex; flex-direction: column; align-items: center; gap: 6px; background: transparent; border: 0; font-size: 14px; }
 .game-dialog { background: var(--cream) !important; border: 0 !important; border-radius: 7px !important; color: #303030; }.game-dialog [data-slot="dialog-title"] { color: #333; font-size: 23px; font-weight: 500; }.game-dialog .btn.subtle,.game-dialog .btn.primary { background: linear-gradient(#40aab5,#a9ddf8); border: 3px solid #fff; box-shadow: 0 3px 0 #929fc2; border-radius: 9px; color: #254553; }.game-dialog .picker-row { padding: 7px; background: #fff6; border-radius: 4px; }.game-dialog .picker-row .icon-btn { background: linear-gradient(#42acb7,#a9ddf7); border: 2px solid white; color: #244654; min-height: 38px; min-width: 38px; }.game-dialog [data-slot="dialog-close"] { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; color: #333; }
 @media(min-width: 761px) and (max-height: 760px) { .in-game .player-card { min-height: 74px; grid-template-rows: 19px 1fr; padding-top: 3px; padding-bottom: 6px; }.player-name { font-size: 15px; line-height: 19px; }.player-score-avatar .avatar-badge { width: 36px; height: 36px; }.player-card-stats { --card-width: 29px; }.in-game .bank-strip { min-height: 63px; --card-width: 30px; }.in-game .table-area { grid-template-rows: 25px minmax(240px,1fr) 46px 78px; }.trade-dialog[data-slot="dialog-content"] { bottom: 105px; } }
