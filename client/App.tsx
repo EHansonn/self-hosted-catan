@@ -75,6 +75,7 @@ import {
   getTurnAttention,
   playTurnNotification,
 } from "./turnNotifications";
+import { hasRemainingTurnAction } from "./turnActions";
 import { orderPlayersForViewer } from "./playerOrder";
 import {
   type RoomView,
@@ -917,6 +918,12 @@ export function App() {
     active && game
       ? affordableBuildOptions(hand, game.legal)
       : undefined;
+  const promptEndTurn = !!(
+    active &&
+    game &&
+    me &&
+    !hasRemainingTurnAction(game, me)
+  );
   const chooseBuildSite = (type: Build, id: number) => {
     if (!active || !game || !boardBuildOptions?.[type].includes(id)) return;
     setBuild(type);
@@ -1278,7 +1285,7 @@ export function App() {
           <Sprite name={type} />
         </ActionTile>;
       })}
-      <ActionTile label="End turn" disabled={!active} onClick={() => { setModal(null); act({ type: "end" }); }}><EndTurnIcon /></ActionTile>
+      <ActionTile className={promptEndTurn ? "end-turn-prompt" : ""} label="End turn" disabled={!active} onClick={() => { setModal(null); act({ type: "end" }); }}><EndTurnIcon /></ActionTile>
     </div>
   ) : null;
   const updateRoomOptions = (changes: Partial<Options>) => {
