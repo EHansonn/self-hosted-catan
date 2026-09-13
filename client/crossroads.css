@@ -2469,7 +2469,38 @@ input:focus {
     padding: 8px;
   }
   .in-lobby .player-card {
-    min-width: 155px;
+    display: grid;
+    flex: 0 0 210px;
+    min-width: 210px;
+    grid-template-columns: 45px minmax(0, 1fr) auto;
+    grid-template-rows: 1fr 1fr;
+    gap: 0 8px;
+  }
+  .in-lobby .player-card > .avatar-badge,
+  .in-lobby .player-card > .player-color-trigger {
+    grid-column: 1;
+    grid-row: 1 / -1;
+    align-self: center;
+  }
+  .in-lobby .player-info {
+    grid-column: 2;
+    grid-row: 1 / -1;
+    align-self: center;
+  }
+  .in-lobby .pregame-ready {
+    grid-column: 3;
+    grid-row: 1;
+    align-self: end;
+    margin-left: 0;
+  }
+  .in-lobby .pregame-ready:last-child {
+    grid-row: 1 / -1;
+    align-self: center;
+  }
+  .in-lobby .player-card > .icon-btn {
+    grid-column: 3;
+    grid-row: 2;
+    align-self: start;
   }
   .in-lobby .crew-panel > .panel-title,
   .in-lobby .crew-bottom,
