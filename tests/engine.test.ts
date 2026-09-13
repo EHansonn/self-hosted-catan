@@ -620,6 +620,34 @@ test("knight exposes every legal robber hex for circular placement targets", () 
   assert.ok(!legal.includes(oldRobber));
   assert.equal(new Set(legal).size, legal.length);
 });
+test("the robber can never remain on its current hex, including timeouts", () => {
+  for (const friendlyRobber of [false, true]) {
+    for (let seed = 1; seed <= 24; seed++) {
+      const game = setup(fresh(4, seed));
+      game.phase = "robber";
+      game.options.friendlyRobber = friendlyRobber;
+      const player = game.players[game.current];
+      const currentHex = game.robber;
+
+      assert.ok(!robberSites(game, player).includes(currentHex));
+      assert.ok(!viewGame(game, player.id).legal.robber.includes(currentHex));
+      assert.throws(
+        () => applyAction(game, player.id, { type: "robber", id: currentHex }),
+        /another eligible hex/,
+      );
+
+      const timeoutAction = chooseTimeoutAction(game, player);
+      assert.equal(timeoutAction?.type, "robber");
+      if (timeoutAction?.type === "robber")
+        assert.notEqual(timeoutAction.id, currentHex);
+
+      const botAction = chooseBotAction(game, player);
+      assert.equal(botAction?.type, "robber");
+      if (botAction?.type === "robber")
+        assert.notEqual(botAction.id, currentHex);
+    }
+  }
+});
 test("required actions, discards and main turns use their own clocks", () => {
   let opening = fresh();
   opening.options.timer = 60;
