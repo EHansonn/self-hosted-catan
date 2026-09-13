@@ -105,6 +105,13 @@ import {
 type Room = RoomView & { paused: boolean };
 type Build = "road" | "settlement" | "city";
 type Command = Record<string, unknown>;
+type CommandResponse = {
+  ok: boolean;
+  error?: string;
+  reason?: "stale";
+  version?: number;
+};
+type CommandOptions = { retryStale?: boolean };
 const PLAYER_COUNTS = Array.from(
   { length: MAX_PLAYERS - MIN_PLAYERS + 1 },
   (_, index) => MIN_PLAYERS + index,
@@ -276,7 +283,6 @@ export function App() {
     [selection, setSelection] = useState<{
       type: Build | "robber";
       id: number;
-      version: number;
     } | null>(null),
     [modal, setModal] = useState<
       | "trade"
@@ -447,37 +453,67 @@ export function App() {
     );
     return () => window.clearTimeout(timeout);
   }, [animationCue]);
-  const command = useCallback(async (input: Command) => {
-    if (!socket.current?.connected) {
+  const command = useCallback(async (
+    input: Command,
+    options: CommandOptions = {},
+  ) => {
+    const activeSocket = socket.current;
+    if (!activeSocket?.connected) {
       toast.error("Reconnecting to the table…");
       return false;
     }
     setPending(true);
-    return new Promise<boolean>((resolve) =>
-      socket
-        .current!.timeout(6000)
-        .emit(
-          "command",
-          input,
-          (error: Error | null, response: { ok: boolean; error?: string }) => {
-            setPending(false);
-            if (error || !response?.ok) {
-              toast.error(
-                error
-                  ? "The server did not respond. Your game is saved."
-                  : response?.error || "Action failed.",
-              );
-              resolve(false);
-            } else resolve(true);
-          },
-        ),
-    );
+    const send = (value: Command) =>
+      new Promise<{ error: Error | null; response?: CommandResponse }>(
+        (resolve) =>
+          activeSocket
+            .timeout(6000)
+            .emit(
+              "command",
+              value,
+              (error: Error | null, response: CommandResponse) =>
+                resolve({ error, response }),
+            ),
+      );
+    let result = await send(input);
+    if (
+      !result.error &&
+      !result.response?.ok &&
+      result.response?.reason === "stale" &&
+      options.retryStale &&
+      Number.isInteger(result.response.version)
+    ) {
+      result = await send({ ...input, version: result.response.version });
+    }
+    setPending(false);
+    if (result.error || !result.response?.ok) {
+      if (result.response?.reason === "stale") return false;
+      toast.error(
+        result.error
+          ? "The server did not respond. Your game is saved."
+          : result.response?.error || "Action failed.",
+      );
+      return false;
+    }
+    return true;
   }, []);
   const act = useCallback(
     async (action: Action) => {
       const g = roomRef.current?.game;
       if (!g) return false;
-      return command({ type: "action", version: g.version, action });
+      return command(
+        { type: "action", version: g.version, action },
+        {
+          retryStale: [
+            "road",
+            "settlement",
+            "city",
+            "robber",
+            "steal",
+            "discard",
+          ].includes(action.type),
+        },
+      );
     },
     [command],
   );
@@ -748,15 +784,10 @@ export function App() {
           : game.phase === "robber"
             ? "robber"
             : build;
-    if (type) setSelection({ type, id, version: game.version });
+    if (type) setSelection({ type, id });
   };
   const confirmPlacement = async () => {
     if (!selection || pending) return;
-    if (roomRef.current?.game?.version !== selection.version) {
-      setSelection(null);
-      toast.info("The board changed. Choose your placement again.");
-      return;
-    }
     if (await act({ type: selection.type, id: selection.id })) {
       setBuild(null);
       setSelection(null);
@@ -856,7 +887,7 @@ export function App() {
   const chooseBuildSite = (type: Build, id: number) => {
     if (!active || !game || !boardBuildOptions?.[type].includes(id)) return;
     setBuild(type);
-    setSelection({ type, id, version: game.version });
+    setSelection({ type, id });
     setModal(null);
   };
   const phaseText = room?.paused
@@ -1759,7 +1790,9 @@ export function App() {
                     aria-pressed={specialBuildQueued}
                     title={specialBuildLabel}
                     disabled={pending || room.paused || !connected}
-                    onClick={() => command({ type: "specialBuild", version: game.version })}
+                    onClick={() =>
+                      command({ type: "specialBuild", version: game.version })
+                    }
                   >
                     <Flag size={25} fill={specialBuildQueued ? "currentColor" : "none"} />
                   </button>

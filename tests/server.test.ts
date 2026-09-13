@@ -76,14 +76,26 @@ test("packaged server: guest joins, creator-only rooms, scaled tables, privacy, 
       s.once("connect_error", reject);
     });
     const cmd = (v: unknown) =>
-      new Promise<{ ok: boolean; error?: string }>((resolve, reject) =>
+      new Promise<{
+        ok: boolean;
+        error?: string;
+        reason?: "stale";
+        version?: number;
+      }>((resolve, reject) =>
         s
           .timeout(3000)
           .emit(
             "command",
             v,
-            (e: Error | null, r: { ok: boolean; error?: string }) =>
-              e ? reject(e) : resolve(r),
+            (
+              e: Error | null,
+              r: {
+                ok: boolean;
+                error?: string;
+                reason?: "stale";
+                version?: number;
+              },
+            ) => (e ? reject(e) : resolve(r)),
           ),
       );
     await cmd({ type: "sync" });
@@ -524,16 +536,14 @@ test("packaged server: guest joins, creator-only rooms, scaled tables, privacy, 
       ).ok,
       false,
     );
-    assert.equal(
-      (
-        await rollingClient.cmd({
-          type: "action",
-          version,
-          action: { type: "roll" },
-        })
-      ).ok,
-      false,
-    );
+    const staleRoll = await rollingClient.cmd({
+      type: "action",
+      version,
+      action: { type: "roll" },
+    });
+    assert.equal(staleRoll.ok, false);
+    assert.equal(staleRoll.reason, "stale");
+    assert.equal(staleRoll.version, rollingClient.state!.game!.version);
     assert.equal((await clients[1].cmd({ type: "close" })).ok, false);
     assert.equal((await clients[1].cmd({ type: "pause" })).ok, false);
     assert.equal(

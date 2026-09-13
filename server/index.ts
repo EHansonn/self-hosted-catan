@@ -1396,7 +1396,7 @@ io.on("connection", (socket) => {
         if (r.paused) fail("The host has paused this table.");
         const version = z.number().int().parse(command.version);
         if (version !== r.game.version)
-          fail("The board changed. Please try again.");
+          return ack({ ok: false, reason: "stale", version: r.game.version });
         r.game = toggleSpecialBuildRequest(r.game, session.id);
         changed(r);
         return ack({ ok: true });
@@ -1411,7 +1411,7 @@ io.on("connection", (socket) => {
           (action.type === "accept" || action.type === "reject") &&
           r.game.offer?.id === action.offerId;
         if (version !== r.game.version && !respondingToCurrentOffer)
-          fail("The board changed. Please try again.");
+          return ack({ ok: false, reason: "stale", version: r.game.version });
         r.game = applyAction(r.game, session.id, action);
         changed(r);
         return ack({ ok: true });
