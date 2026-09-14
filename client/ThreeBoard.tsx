@@ -20,6 +20,8 @@ type Stage = {
   staticKey: string | null;
   dirty: boolean;
   textures: Map<string, THREE.Texture>;
+  materials: Map<string, THREE.Material>;
+  geometries: Map<string, THREE.BufferGeometry>;
   staticTargets: { element: HTMLElement; point: THREE.Vector3 }[];
   dynamicTargets: { element: HTMLElement; point: THREE.Vector3 }[];
   motions: {
@@ -90,10 +92,13 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
     group.add(staticGroup, dynamicGroup);
     scene.add(group);
     const textures = new Map<string, THREE.Texture>();
+    const materials = new Map<string, THREE.Material>();
+    const geometries = new Map<string, THREE.BufferGeometry>();
     const disposeGroup = (target: THREE.Group) => {
       target.traverse((obj) => {
         const mesh = obj as THREE.Mesh;
-        if (mesh.geometry) mesh.geometry.dispose();
+        if (mesh.geometry && !mesh.geometry.userData.persistent)
+          mesh.geometry.dispose();
         if (mesh.material) {
           const materials = Array.isArray(mesh.material)
             ? mesh.material
@@ -102,7 +107,7 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
             const map = (m as THREE.MeshStandardMaterial).map;
             if (map && map.userData.label && !map.userData.persistent)
               map.dispose();
-            m.dispose();
+            if (!m.userData.persistent) m.dispose();
           });
         }
       });
@@ -151,6 +156,8 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
       dynamicGroup,
       staticKey: null,
       textures,
+      materials,
+      geometries,
       staticTargets: [],
       dynamicTargets: [],
       motions: [],
@@ -271,6 +278,8 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
       disposeGroup(staticGroup);
       disposeGroup(dynamicGroup);
       textures.forEach((t) => t.dispose());
+      materials.forEach((m) => m.dispose());
+      geometries.forEach((g) => g.dispose());
       renderer.dispose();
       renderer.domElement.removeEventListener("pointerdown", pointerDown);
       renderer.domElement.removeEventListener("pointerup", pointerUp);
@@ -310,8 +319,51 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
     if (animation) s.lastAnimationId = animation.id;
     const color = (id: string) =>
       players.find((p) => p.id === id)?.color || "#fff";
-    const material = (color: string, extra = {}) =>
-      new THREE.MeshStandardMaterial({ color, roughness: 0.8, ...extra });
+    const resourceKey = (value: unknown): unknown => {
+      if (value instanceof THREE.Texture) return `texture:${value.uuid}`;
+      if (value instanceof THREE.Color) return `color:${value.getHexString()}`;
+      if (Array.isArray(value)) return value.map(resourceKey);
+      if (value && typeof value === "object")
+        return Object.fromEntries(
+          Object.entries(value).sort(([left], [right]) =>
+            left.localeCompare(right),
+          ).map(([key, nested]) => [key, resourceKey(nested)]),
+        );
+      return value;
+    };
+    const material = (
+      color: THREE.ColorRepresentation,
+      extra: THREE.MeshStandardMaterialParameters = {},
+    ) => {
+      const parameters = { color, roughness: 0.8, ...extra };
+      const key = `standard:${JSON.stringify(resourceKey(parameters))}`;
+      const cached = s.materials.get(key);
+      if (cached) return cached as THREE.MeshStandardMaterial;
+      const created = new THREE.MeshStandardMaterial(parameters);
+      created.userData.persistent = true;
+      s.materials.set(key, created);
+      return created;
+    };
+    const basicMaterial = (parameters: THREE.MeshBasicMaterialParameters) => {
+      const key = `basic:${JSON.stringify(resourceKey(parameters))}`;
+      const cached = s.materials.get(key);
+      if (cached) return cached as THREE.MeshBasicMaterial;
+      const created = new THREE.MeshBasicMaterial(parameters);
+      created.userData.persistent = true;
+      s.materials.set(key, created);
+      return created;
+    };
+    const geometry = <T extends THREE.BufferGeometry>(
+      key: string,
+      create: () => T,
+    ) => {
+      const cached = s.geometries.get(key);
+      if (cached) return cached as T;
+      const created = create();
+      created.userData.persistent = true;
+      s.geometries.set(key, created);
+      return created;
+    };
     const terrainTexture = (
       terrain: keyof typeof TERRAIN,
     ): THREE.CanvasTexture => {
@@ -399,45 +451,53 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
       x: number,
       z: number,
     ) => {
-      const canvas = document.createElement("canvas");
-      canvas.width = 256;
-      canvas.height = 256;
-      const ctx = canvas.getContext("2d")!;
-      ctx.beginPath();
-      ctx.arc(128, 128, 116, 0, Math.PI * 2);
-      ctx.fillStyle = "#fffdf1";
-      ctx.fill();
-      ctx.strokeStyle = "#c4ae81";
-      ctx.lineWidth = 10;
-      ctx.stroke();
-      const hot = value === 6 || value === 8;
-      const tint = hot ? "#bd1111" : "#064c18";
-      ctx.fillStyle = tint;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.font = `900 ${value >= 10 ? 88 : 105}px Arial Black, Arial, sans-serif`;
-      ctx.fillText(String(value), 128, 108);
-      const pipCount = 6 - Math.abs(7 - value);
-      const pipSpacing = 24;
-      for (let pip = 0; pip < pipCount; pip++) {
+      const textureKey = `number-token-${value}`;
+      let map = s.textures.get(textureKey);
+      if (!map) {
+        const canvas = document.createElement("canvas");
+        canvas.width = 256;
+        canvas.height = 256;
+        const ctx = canvas.getContext("2d")!;
         ctx.beginPath();
-        ctx.arc(
-          128 + (pip - (pipCount - 1) / 2) * pipSpacing,
-          184,
-          8,
-          0,
-          Math.PI * 2,
-        );
+        ctx.arc(128, 128, 116, 0, Math.PI * 2);
+        ctx.fillStyle = "#fffdf1";
         ctx.fill();
+        ctx.strokeStyle = "#c4ae81";
+        ctx.lineWidth = 10;
+        ctx.stroke();
+        const hot = value === 6 || value === 8;
+        const tint = hot ? "#bd1111" : "#064c18";
+        ctx.fillStyle = tint;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.font = `900 ${value >= 10 ? 88 : 105}px Arial Black, Arial, sans-serif`;
+        ctx.fillText(String(value), 128, 108);
+        const pipCount = 6 - Math.abs(7 - value);
+        const pipSpacing = 24;
+        for (let pip = 0; pip < pipCount; pip++) {
+          ctx.beginPath();
+          ctx.arc(
+            128 + (pip - (pipCount - 1) / 2) * pipSpacing,
+            184,
+            8,
+            0,
+            Math.PI * 2,
+          );
+          ctx.fill();
+        }
+        map = new THREE.CanvasTexture(canvas);
+        map.colorSpace = THREE.SRGBColorSpace;
+        map.anisotropy = Math.min(8, s.renderer.capabilities.getMaxAnisotropy());
+        map.userData.label = true;
+        map.userData.persistent = true;
+        s.textures.set(textureKey, map);
       }
-      const map = new THREE.CanvasTexture(canvas);
-      map.colorSpace = THREE.SRGBColorSpace;
-      map.anisotropy = Math.min(8, s.renderer.capabilities.getMaxAnisotropy());
-      map.userData.label = true;
       const token = new THREE.Group();
       token.position.set(x, 0, z);
       const base = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.35, 0.37, 0.075, 32),
+        geometry("number-token-base", () =>
+          new THREE.CylinderGeometry(0.35, 0.37, 0.075, 32),
+        ),
         material("#b99b68", { roughness: 0.7 }),
       );
       base.position.y = 0.205;
@@ -445,8 +505,8 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
       base.receiveShadow = true;
       token.add(base);
       const face = new THREE.Mesh(
-        new THREE.PlaneGeometry(0.7, 0.7),
-        new THREE.MeshBasicMaterial({
+        geometry("number-token-face", () => new THREE.PlaneGeometry(0.7, 0.7)),
+        basicMaterial({
           map,
           transparent: true,
           alphaTest: 0.03,
@@ -465,48 +525,55 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
       return token;
     };
     const robberMarker = (x: number, z: number) => {
-      const canvas = document.createElement("canvas");
-      canvas.width = 256;
-      canvas.height = 256;
-      const ctx = canvas.getContext("2d")!;
-      ctx.beginPath();
-      ctx.arc(128, 128, 116, 0, Math.PI * 2);
-      ctx.fillStyle = "#fff6d9";
-      ctx.fill();
-      ctx.lineWidth = 13;
-      ctx.strokeStyle = "#f1c65a";
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.arc(128, 128, 88, 0, Math.PI * 2);
-      ctx.fillStyle = "#d8edf1";
-      ctx.fill();
-      ctx.lineWidth = 9;
-      ctx.strokeStyle = "#244958";
-      ctx.stroke();
-      ctx.save();
-      ctx.translate(48, 47);
-      ctx.scale(6.65, 6.65);
-      ctx.strokeStyle = "#173b4b";
-      ctx.lineWidth = 2.15;
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
-      for (const path of [
-        "M5 20a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v1a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1z",
-        "M16.5 18c1-2 2.5-5 2.5-9a7 7 0 0 0-7-7H6.635a1 1 0 0 0-.768 1.64L7 5l-2.32 5.802a2 2 0 0 0 .95 2.526l2.87 1.456",
-        "m15 5 1.425-1.425",
-        "m17 8 1.53-1.53",
-        "M9.713 12.185 7 18",
-      ])
-        ctx.stroke(new Path2D(path));
-      ctx.restore();
-      const map = new THREE.CanvasTexture(canvas);
-      map.colorSpace = THREE.SRGBColorSpace;
-      map.anisotropy = Math.min(8, s.renderer.capabilities.getMaxAnisotropy());
-      map.userData.label = true;
+      let map = s.textures.get("robber-marker");
+      if (!map) {
+        const canvas = document.createElement("canvas");
+        canvas.width = 256;
+        canvas.height = 256;
+        const ctx = canvas.getContext("2d")!;
+        ctx.beginPath();
+        ctx.arc(128, 128, 116, 0, Math.PI * 2);
+        ctx.fillStyle = "#fff6d9";
+        ctx.fill();
+        ctx.lineWidth = 13;
+        ctx.strokeStyle = "#f1c65a";
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(128, 128, 88, 0, Math.PI * 2);
+        ctx.fillStyle = "#d8edf1";
+        ctx.fill();
+        ctx.lineWidth = 9;
+        ctx.strokeStyle = "#244958";
+        ctx.stroke();
+        ctx.save();
+        ctx.translate(48, 47);
+        ctx.scale(6.65, 6.65);
+        ctx.strokeStyle = "#173b4b";
+        ctx.lineWidth = 2.15;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        for (const path of [
+          "M5 20a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v1a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1z",
+          "M16.5 18c1-2 2.5-5 2.5-9a7 7 0 0 0-7-7H6.635a1 1 0 0 0-.768 1.64L7 5l-2.32 5.802a2 2 0 0 0 .95 2.526l2.87 1.456",
+          "m15 5 1.425-1.425",
+          "m17 8 1.53-1.53",
+          "M9.713 12.185 7 18",
+        ])
+          ctx.stroke(new Path2D(path));
+        ctx.restore();
+        map = new THREE.CanvasTexture(canvas);
+        map.colorSpace = THREE.SRGBColorSpace;
+        map.anisotropy = Math.min(8, s.renderer.capabilities.getMaxAnisotropy());
+        map.userData.label = true;
+        map.userData.persistent = true;
+        s.textures.set("robber-marker", map);
+      }
       const marker = new THREE.Group();
       marker.position.set(x, 0, z);
       const base = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.215, 0.235, 0.09, 32),
+        geometry("robber-marker-base", () =>
+          new THREE.CylinderGeometry(0.215, 0.235, 0.09, 32),
+        ),
         material("#d8b967", { roughness: 0.68 }),
       );
       base.position.y = 0.225;
@@ -514,8 +581,8 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
       base.receiveShadow = true;
       marker.add(base);
       const face = new THREE.Mesh(
-        new THREE.PlaneGeometry(0.43, 0.43),
-        new THREE.MeshBasicMaterial({
+        geometry("robber-marker-face", () => new THREE.PlaneGeometry(0.43, 0.43)),
+        basicMaterial({
           map,
           transparent: true,
           alphaTest: 0.03,
@@ -812,15 +879,18 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
       }
       renderGroup = s.dynamicGroup;
       if (animation?.rolledTiles.includes(tile.id)) {
-        const glowMaterial = new THREE.MeshBasicMaterial({
+        const glowMaterial = basicMaterial({
           color: "#fff29b",
           transparent: true,
           opacity: 0,
           depthWrite: false,
           side: THREE.DoubleSide,
         });
+        glowMaterial.opacity = 0;
         const glow = add(
-          new THREE.CylinderGeometry(1.015, 1.015, 0.035, 6),
+          geometry("rolled-tile-glow", () =>
+            new THREE.CylinderGeometry(1.015, 1.015, 0.035, 6),
+          ),
           glowMaterial,
           tile.x,
           0.185,
@@ -881,20 +951,25 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
       if (kind === "tile" && highlights.includes(tile.id)) {
         const selected = props.selected === tile.id;
         const hit = add(
-          new THREE.CylinderGeometry(0.83, 0.83, 0.08, 6),
-          new THREE.MeshBasicMaterial({ visible: false }),
+          geometry("tile-pick-hit", () =>
+            new THREE.CylinderGeometry(0.83, 0.83, 0.08, 6),
+          ),
+          basicMaterial({ visible: false }),
           tile.x,
           0.22,
           tile.y,
         );
         hit.userData.pick = tile.id;
         const shadow = add(
-          new THREE.RingGeometry(
-            selected ? 0.38 : 0.4,
-            selected ? 0.59 : 0.56,
-            48,
+          geometry(
+            `tile-pick-shadow-${selected}`,
+            () => new THREE.RingGeometry(
+              selected ? 0.38 : 0.4,
+              selected ? 0.59 : 0.56,
+              48,
+            ),
           ),
-          new THREE.MeshBasicMaterial({
+          basicMaterial({
             color: "#173744",
             transparent: true,
             opacity: 0.48,
@@ -908,12 +983,15 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
         shadow.rotation.x = -Math.PI / 2;
         shadow.renderOrder = 18;
         const marker = add(
-          new THREE.RingGeometry(
-            selected ? 0.37 : 0.39,
-            selected ? 0.54 : 0.51,
-            48,
+          geometry(
+            `tile-pick-marker-${selected}`,
+            () => new THREE.RingGeometry(
+              selected ? 0.37 : 0.39,
+              selected ? 0.54 : 0.51,
+              48,
+            ),
           ),
-          new THREE.MeshBasicMaterial({
+          basicMaterial({
             color: selected ? "#fff39a" : "#ddeb75",
             transparent: true,
             opacity: selected ? 1 : 0.94,
@@ -930,12 +1008,15 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
         marker.renderOrder = 20;
         marker.userData.pick = tile.id;
         const markerRim = add(
-          new THREE.RingGeometry(
-            selected ? 0.53 : 0.5,
-            selected ? 0.59 : 0.56,
-            48,
+          geometry(
+            `tile-pick-rim-${selected}`,
+            () => new THREE.RingGeometry(
+              selected ? 0.53 : 0.5,
+              selected ? 0.59 : 0.56,
+              48,
+            ),
           ),
-          new THREE.MeshBasicMaterial({
+          basicMaterial({
             color: "#ffffff",
             transparent: true,
             opacity: selected ? 1 : 0.9,
@@ -994,7 +1075,7 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
       );
       if (e.owner || enabled) {
         const road = add(
-          new THREE.BoxGeometry(0.13, 0.14, 0.73),
+          geometry("road", () => new THREE.BoxGeometry(0.13, 0.14, 0.73)),
           material(e.owner ? color(e.owner) : "#ffe2a2", {
             emissive: enabled ? "#94712d" : "#000000",
             emissiveIntensity: 0.8,
@@ -1016,8 +1097,8 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
       }
       if (!e.owner && (enabled || contextual)) {
         const hit = add(
-          new THREE.BoxGeometry(0.4, 0.2, 1),
-          new THREE.MeshBasicMaterial({ visible: false }),
+          geometry("road-pick-hit", () => new THREE.BoxGeometry(0.4, 0.2, 1)),
+          basicMaterial({ visible: false }),
           (a.x + b.x) / 2,
           0.3,
           (a.y + b.y) / 2,
@@ -1046,14 +1127,18 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
       );
       if (v.owner) {
         const building = [add(
-          new THREE.BoxGeometry(v.city ? 0.32 : 0.23, 0.23, 0.23),
+          geometry(`building-body-${v.city ? "city" : "settlement"}`, () =>
+            new THREE.BoxGeometry(v.city ? 0.32 : 0.23, 0.23, 0.23),
+          ),
           material(color(v.owner)),
           v.x,
           0.33,
           v.y,
         )];
         const roof = add(
-          new THREE.CylinderGeometry(0, 0.22, 0.2, 4),
+          geometry("building-roof", () =>
+            new THREE.CylinderGeometry(0, 0.22, 0.2, 4),
+          ),
           material(color(v.owner)),
           v.x,
           0.54,
@@ -1063,7 +1148,9 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
         roof.rotation.y = Math.PI / 4;
         if (v.city)
           building.push(add(
-            new THREE.BoxGeometry(0.16, 0.4, 0.18),
+            geometry("building-city-tower", () =>
+              new THREE.BoxGeometry(0.16, 0.4, 0.18),
+            ),
             material(color(v.owner)),
             v.x + 0.2,
             0.42,
@@ -1083,7 +1170,9 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
       }
       if (enabled) {
         const pick = add(
-          new THREE.CylinderGeometry(0.24, 0.24, 0.08, 24),
+          geometry("vertex-pick", () =>
+            new THREE.CylinderGeometry(0.24, 0.24, 0.08, 24),
+          ),
           material("#ffe2a2", {
             emissive: "#c2943b",
             emissiveIntensity: 1,
@@ -1098,8 +1187,10 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
       }
       if (contextualType) {
         const hit = add(
-          new THREE.CylinderGeometry(0.31, 0.31, 0.22, 24),
-          new THREE.MeshBasicMaterial({ visible: false }),
+          geometry("vertex-pick-hit", () =>
+            new THREE.CylinderGeometry(0.31, 0.31, 0.22, 24),
+          ),
+          basicMaterial({ visible: false }),
           v.x,
           0.32,
           v.y,
