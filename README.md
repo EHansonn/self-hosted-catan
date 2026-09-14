@@ -1,7 +1,7 @@
 # Self-hosted hex based settlement game
 
 A slop-AI-coded, self-hosted way to play a hex-based trading and settlement
-game for free with friends and coworkers—without carrying a physical set or
+game for free with up to 12 friends and coworkers—without carrying a physical set or
 depending on a hosted browser service.
 
 This is an unofficial, self-hosted game inspired by CATAN and online
