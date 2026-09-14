@@ -1,4 +1,4 @@
-# Self hosted hex based settlement game
+# Self-hosted hex based settlement game
 
 A slop-AI-coded, self-hosted way to play a hex-based trading and settlement
 game for free with friends and coworkers—without carrying a physical set or
