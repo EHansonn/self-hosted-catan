@@ -16,17 +16,17 @@ affiliated with or endorsed by CATAN, Catan Studio, or Colonist.io.
 
 ### Game lobby
 
-![A Crossroads lobby in light mode with a map preview and four seats](docs/screenshots/lobby.png)
+![A Crossroads lobby in light mode with a map preview and four seats](docs/screenshots/lobby-light.png)
 
 ### Game in progress
 
-![A Crossroads game in progress using the 2D board in light mode](docs/screenshots/game-2d.png)
+![A Crossroads game in progress using the 2D board in light mode](docs/screenshots/game-2d-light.png)
 
-![A Crossroads game in progress using the 3D board in light mode](docs/screenshots/game-3d.png)
+![A Crossroads game in progress using the 3D board in light mode](docs/screenshots/game-3d-light.png)
 
 ### Mobile
 
-![A Crossroads game in progress inside a simple iPhone frame](docs/screenshots/mobile.png)
+![A Crossroads game in progress inside a simple iPhone frame](docs/screenshots/mobile-light.png)
 
 Refresh every README screenshot from deterministic local game states:
 

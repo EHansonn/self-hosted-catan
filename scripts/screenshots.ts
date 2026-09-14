@@ -57,7 +57,7 @@ function screenshotOptions(): Options {
 
 function lobbyRoom(now: number): StoredRoom {
   const players = [
-    makePlayer(lobbyHostId, "Evan", 0),
+    makePlayer(lobbyHostId, "Atlas", 0),
     makePlayer("bot-lobby-willow", "Willow", 1, true),
     makePlayer("bot-lobby-kestrel", "Kestrel", 2, true),
     makePlayer("bot-lobby-reef", "Reef", 3, true),
@@ -105,7 +105,7 @@ function playToScreenshotState(players: Player[]) {
 
 function gameRoom(now: number): StoredRoom {
   const players = [
-    makePlayer(gameHostId, "Evan", 0),
+    makePlayer(gameHostId, "Atlas", 0),
     makePlayer("bot-game-willow", "Willow", 1, true),
     makePlayer("bot-game-kestrel", "Kestrel", 2, true),
     makePlayer("bot-game-reef", "Reef", 3, true),
@@ -120,7 +120,7 @@ function gameRoom(now: number): StoredRoom {
     game,
     chat: [
       { id: 1, name: "Willow", text: "Ore for wheat?" },
-      { id: 2, name: "Evan", text: "Maybe next turn." },
+      { id: 2, name: "Atlas", text: "Maybe next turn." },
     ],
     updated: now,
     matchId: "1234567890abcdef12345678",
@@ -265,7 +265,7 @@ async function captureDesktop(baseUrl: string) {
       (element.textContent = `https://crossroads.local/?room=${code}`),
     lobbyCode,
   );
-  await lobby.screenshot({ path: join(outputDirectory, "lobby.png") });
+  await lobby.screenshot({ path: join(outputDirectory, "lobby-light.png") });
   await lobbyContext.close();
 
   const gameContext = await prepareContext(
@@ -276,12 +276,12 @@ async function captureDesktop(baseUrl: string) {
   const game = await openSavedRoom(gameContext, baseUrl, "in-game");
   await game.getByLabel("Interactive island game board").waitFor();
   await pinVisibleClock(game);
-  await game.screenshot({ path: join(outputDirectory, "game-2d.png") });
+  await game.screenshot({ path: join(outputDirectory, "game-2d-light.png") });
   await game.getByRole("button", { name: "3D", exact: true }).click();
   await game.locator("canvas").waitFor();
   await game.waitForTimeout(800);
   await pinVisibleClock(game);
-  await game.screenshot({ path: join(outputDirectory, "game-3d.png") });
+  await game.screenshot({ path: join(outputDirectory, "game-3d-light.png") });
   await gameContext.close();
 }
 
@@ -311,7 +311,7 @@ async function captureMobile(baseUrl: string) {
     </div>`);
   await frame.locator("img").waitFor();
   await frame.screenshot({
-    path: join(outputDirectory, "mobile.png"),
+    path: join(outputDirectory, "mobile-light.png"),
     omitBackground: true,
   });
   await frame.close();

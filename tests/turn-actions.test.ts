@@ -10,7 +10,7 @@ import { hasRemainingTurnAction } from "../client/turnActions";
 function turnState() {
   const player: PublicPlayer = {
     id: "p0",
-    name: "Evan",
+    name: "Atlas",
     color: "#f4ae32",
     bot: false,
     difficulty: "normal",
