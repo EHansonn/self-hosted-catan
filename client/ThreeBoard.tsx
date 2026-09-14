@@ -198,9 +198,15 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
     const pointerUp = (e: PointerEvent) => {
       if (Math.hypot(e.clientX - down.x, e.clientY - down.y) > 7) return;
       const hits = raycast(e);
-      const pick = hits.find((hit) => hit.object.userData.pick !== undefined);
+      const pickId = (hit: THREE.Intersection<THREE.Object3D>) =>
+        hit.instanceId === undefined
+          ? hit.object.userData.pick as number | undefined
+          : (hit.object.userData.pickIds as number[] | undefined)?.[
+              hit.instanceId
+            ];
+      const pick = hits.find((hit) => pickId(hit) !== undefined);
       if (pick) {
-        live.current.onPick(pick.object.userData.pick);
+        live.current.onPick(pickId(pick)!);
         return;
       }
       const contextual = hits.find(
@@ -298,6 +304,7 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
     if (!s) return;
     const props = live.current;
     const { board, players, robber, kind, highlights } = props;
+    const highlightedSites = new Set(highlights);
     const staticKey = threeBoardStaticKey(board);
     const rebuildStatic = staticKey !== s.staticKey;
     s.disposeGroup(s.dynamicGroup);
@@ -948,7 +955,7 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
         if (tile.number) numberToken(tile.number, tile.x, tile.y);
       }
       renderGroup = s.dynamicGroup;
-      if (kind === "tile" && highlights.includes(tile.id)) {
+      if (kind === "tile" && highlightedSites.has(tile.id)) {
         const selected = props.selected === tile.id;
         const hit = add(
           geometry("tile-pick-hit", () =>
@@ -1064,7 +1071,7 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
     }
     renderGroup = s.dynamicGroup;
     for (const e of board.edges) {
-      const enabled = kind === "edge" && highlights.includes(e.id);
+      const enabled = kind === "edge" && highlightedSites.has(e.id);
       const contextual = !!props.buildOptions?.road.includes(e.id);
       if (!e.owner && !enabled && !contextual) continue;
       const a = board.vertices[e.a],
@@ -1111,8 +1118,9 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
         }
       }
     }
+    const vertexPickIds: number[] = [];
     for (const v of board.vertices) {
-      const enabled = kind === "vertex" && highlights.includes(v.id);
+      const enabled = kind === "vertex" && highlightedSites.has(v.id);
       const contextualType: BuildPiece | undefined = props.buildOptions?.city.includes(
         v.id,
       )
@@ -1168,23 +1176,7 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
           });
         }
       }
-      if (enabled) {
-        const pick = add(
-          geometry("vertex-pick", () =>
-            new THREE.CylinderGeometry(0.24, 0.24, 0.08, 24),
-          ),
-          material("#ffe2a2", {
-            emissive: "#c2943b",
-            emissiveIntensity: 1,
-            transparent: true,
-            opacity: 0.85,
-          }),
-          v.x,
-          0.23,
-          v.y,
-        );
-        pick.userData.pick = v.id;
-      }
+      if (enabled) vertexPickIds.push(v.id);
       if (contextualType) {
         const hit = add(
           geometry("vertex-pick-hit", () =>
@@ -1200,7 +1192,31 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
         if (enabled) hit.userData.pick = v.id;
       }
     }
-    for (const id of highlights) {
+    if (vertexPickIds.length) {
+      const picks = new THREE.InstancedMesh(
+        geometry("vertex-pick", () =>
+          new THREE.CylinderGeometry(0.24, 0.24, 0.08, 24),
+        ),
+        material("#ffe2a2", {
+          emissive: "#c2943b",
+          emissiveIntensity: 1,
+          transparent: true,
+          opacity: 0.85,
+        }),
+        vertexPickIds.length,
+      );
+      const transform = new THREE.Matrix4();
+      vertexPickIds.forEach((id, index) => {
+        const vertex = board.vertices[id];
+        transform.makeTranslation(vertex.x, 0.23, vertex.y);
+        picks.setMatrixAt(index, transform);
+      });
+      picks.instanceMatrix.needsUpdate = true;
+      picks.userData.pickIds = vertexPickIds;
+      s.dynamicGroup.add(picks);
+    }
+    const positionedTargets = highlights.length <= 72;
+    for (const id of positionedTargets ? highlights : []) {
       let x = 0,
         z = 0;
       if (kind === "vertex") {
@@ -1225,6 +1241,37 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
       element.onclick = () => live.current.onPick(id);
       container.current!.appendChild(element);
       s.dynamicTargets.push({ element, point: new THREE.Vector3(x, 0.3, z) });
+    }
+    if (!positionedTargets && highlights.length) {
+      const picker = document.createElement("select");
+      picker.className = "sr-only";
+      picker.setAttribute(
+        "aria-label",
+        kind === "vertex"
+          ? "Choose a settlement location"
+          : kind === "edge"
+            ? "Choose a road location"
+            : "Choose a robber location",
+      );
+      const prompt = document.createElement("option");
+      prompt.textContent = "Choose a location";
+      prompt.value = "";
+      prompt.selected = true;
+      picker.appendChild(prompt);
+      for (const id of highlights) {
+        const option = document.createElement("option");
+        option.value = String(id);
+        option.textContent = `Location ${id}`;
+        picker.appendChild(option);
+      }
+      picker.onchange = () => {
+        if (picker.value) live.current.onPick(Number(picker.value));
+      };
+      container.current!.appendChild(picker);
+      s.dynamicTargets.push({
+        element: picker,
+        point: new THREE.Vector3(0, 0, 0),
+      });
     }
     s.dirty = true;
   }, [visualKey]);

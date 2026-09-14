@@ -806,6 +806,8 @@ function Board2D({
   const roadCandidates = new Set(buildOptions?.road || []);
   const settlementCandidates = new Set(buildOptions?.settlement || []);
   const cityCandidates = new Set(buildOptions?.city || []);
+  const highlightedSites = new Set(highlights);
+  const animateSiteMarkers = highlights.length <= 72;
   const rolledTiles = new Set(animation?.rolledTiles || []);
   const robberMove = animation?.robber;
   const robberTile = board.tiles.find((tile) => tile.id === robber);
@@ -898,7 +900,7 @@ function Board2D({
         const poly = tile.vertices
           .map((id) => `${board.vertices[id].x},${board.vertices[id].y}`)
           .join(" ");
-        const enabled = kind === "tile" && highlights.includes(tile.id);
+        const enabled = kind === "tile" && highlightedSites.has(tile.id);
         const rolled = rolledTiles.has(tile.id);
         return (
           <g
@@ -1025,12 +1027,12 @@ function Board2D({
           (e) =>
             e.owner ||
             roadCandidates.has(e.id) ||
-            (kind === "edge" && highlights.includes(e.id)),
+            (kind === "edge" && highlightedSites.has(e.id)),
         )
         .map((e) => {
           const a = board.vertices[e.a],
             b = board.vertices[e.b],
-            enabled = kind === "edge" && highlights.includes(e.id),
+            enabled = kind === "edge" && highlightedSites.has(e.id),
             contextual = roadCandidates.has(e.id),
             interactive = enabled || contextual,
             mx = (a.x + b.x) / 2,
@@ -1086,7 +1088,7 @@ function Board2D({
                   fillOpacity={selected === e.id ? ".82" : ".5"}
                   stroke="#fff4cf"
                   strokeWidth={selected === e.id ? ".055" : ".035"}
-                  className="site-pulse"
+                  className={animateSiteMarkers ? "site-pulse" : undefined}
                 />
               )}
               <line
@@ -1106,10 +1108,10 @@ function Board2D({
             v.owner ||
             settlementCandidates.has(v.id) ||
             cityCandidates.has(v.id) ||
-            (kind === "vertex" && highlights.includes(v.id)),
+            (kind === "vertex" && highlightedSites.has(v.id)),
         )
         .map((v) => {
-          const enabled = kind === "vertex" && highlights.includes(v.id);
+          const enabled = kind === "vertex" && highlightedSites.has(v.id);
           const contextualType: BuildPiece | undefined = cityCandidates.has(v.id)
             ? "city"
             : settlementCandidates.has(v.id)
@@ -1140,7 +1142,7 @@ function Board2D({
                   fillOpacity={selected === v.id ? ".8" : ".25"}
                   stroke={selected === v.id ? "#fff" : "#ffe7a2"}
                   strokeWidth={selected === v.id ? ".07" : ".025"}
-                  className="site-pulse"
+                  className={animateSiteMarkers ? "site-pulse" : undefined}
                 />
               )}
               {v.owner ? (
