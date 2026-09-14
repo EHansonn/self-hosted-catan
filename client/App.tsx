@@ -2832,16 +2832,16 @@ export function App() {
                 <LogOut size={17} /> Leave game view
               </button>
             </div>
-          ) : host ? (
+          ) : host && game ? (
             <button className="btn danger" onClick={() => setModal("close")}>
               Close this table
             </button>
-          ) : (
+          ) : game ? (
             <p className="muted">
               Only the host can pause or close this table. The Home screen
               keeps a reconnect option for your saved seat.
             </p>
-          )}
+          ) : null}
           {!spectator && (
             <p className="fine-print">
               Games save automatically. Closing the browser keeps your seat for
