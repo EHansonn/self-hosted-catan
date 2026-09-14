@@ -49,3 +49,14 @@ test("3D placements update pieces without rebuilding static terrain", () => {
     threeBoardStaticKey(props.board),
   );
 });
+
+test("3D selection feedback updates without rebuilding static terrain", () => {
+  const props = sceneProps();
+  const selected = { ...props, selected: props.board.vertices[0].id };
+
+  assert.notEqual(threeBoardVisualKey(selected), threeBoardVisualKey(props));
+  assert.equal(
+    threeBoardStaticKey(selected.board),
+    threeBoardStaticKey(props.board),
+  );
+});

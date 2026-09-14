@@ -1119,6 +1119,7 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
       }
     }
     const vertexPickIds: number[] = [];
+    let selectedVertexPickId: number | null = null;
     for (const v of board.vertices) {
       const enabled = kind === "vertex" && highlightedSites.has(v.id);
       const contextualType: BuildPiece | undefined = props.buildOptions?.city.includes(
@@ -1176,7 +1177,10 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
           });
         }
       }
-      if (enabled) vertexPickIds.push(v.id);
+      if (enabled) {
+        if (props.selected === v.id) selectedVertexPickId = v.id;
+        else vertexPickIds.push(v.id);
+      }
       if (contextualType) {
         const hit = add(
           geometry("vertex-pick-hit", () =>
@@ -1199,9 +1203,9 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
         ),
         material("#ffe2a2", {
           emissive: "#c2943b",
-          emissiveIntensity: 1,
+          emissiveIntensity: selectedVertexPickId === null ? 1 : 0.45,
           transparent: true,
-          opacity: 0.85,
+          opacity: selectedVertexPickId === null ? 0.85 : 0.34,
         }),
         vertexPickIds.length,
       );
@@ -1214,6 +1218,59 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
       picks.instanceMatrix.needsUpdate = true;
       picks.userData.pickIds = vertexPickIds;
       s.dynamicGroup.add(picks);
+    }
+    if (selectedVertexPickId !== null) {
+      const vertex = board.vertices[selectedVertexPickId];
+      const selectedBase = add(
+        geometry("vertex-pick-selected-base", () =>
+          new THREE.CylinderGeometry(0.4, 0.4, 0.08, 24),
+        ),
+        material("#173744", {
+          emissive: "#173744",
+          emissiveIntensity: 0.5,
+        }),
+        vertex.x,
+        0.24,
+        vertex.y,
+      );
+      selectedBase.userData.pick = selectedVertexPickId;
+      const selectedMarker = add(
+        geometry("vertex-pick-selected", () =>
+          new THREE.CylinderGeometry(0.33, 0.33, 0.11, 24),
+        ),
+        material("#fffde2", {
+          emissive: "#ffe05c",
+          emissiveIntensity: 2.2,
+          transparent: true,
+          opacity: 1,
+        }),
+        vertex.x,
+        0.31,
+        vertex.y,
+      );
+      selectedMarker.userData.pick = selectedVertexPickId;
+      const selectedRing = add(
+        geometry("vertex-pick-selected-ring", () =>
+          new THREE.TorusGeometry(0.45, 0.055, 8, 28),
+        ),
+        material("#ffb21c", {
+          emissive: "#ff9d00",
+          emissiveIntensity: 2.4,
+        }),
+        vertex.x,
+        0.35,
+        vertex.y,
+      );
+      selectedRing.rotation.x = Math.PI / 2;
+      selectedRing.userData.pick = selectedVertexPickId;
+      if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        animate(480, (progress) => {
+          const scale = 0.58 + spring(progress) * 0.42;
+          selectedBase.scale.set(scale, 1, scale);
+          selectedMarker.scale.set(scale, 1, scale);
+          selectedRing.scale.setScalar(scale);
+        });
+      }
     }
     const positionedTargets = highlights.length <= 72;
     for (const id of positionedTargets ? highlights : []) {
