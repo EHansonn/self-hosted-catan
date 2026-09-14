@@ -1,10 +1,10 @@
-# Crossroads
+# Self hosted hex based settlement game
 
 A slop-AI-coded, self-hosted way to play a hex-based trading and settlement
 game for free with friends and coworkers—without carrying a physical set or
 depending on a hosted browser service.
 
-Crossroads is an unofficial, self-hosted game inspired by CATAN and online
+This is an unofficial, self-hosted game inspired by CATAN and online
 experiences such as Colonist.io. It is an independent project and is not
 affiliated with or endorsed by CATAN, Catan Studio, or Colonist.io.
 
