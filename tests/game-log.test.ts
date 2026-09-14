@@ -102,3 +102,16 @@ test("special build phases name the active player in the log", () => {
   assert.match(markup, /log-player-name/);
   assert.match(markup, /begins a special build phase/);
 });
+
+test("discard history renders each revealed resource card", () => {
+  const markup = renderToStaticMarkup(
+    createElement(LogMessage, {
+      text: "Mira discards 2 wood and 1 brick.",
+      actor: { name: "Mira", color: "#52c9cf" },
+    }),
+  );
+
+  assert.match(markup, /game-card wood/);
+  assert.match(markup, /game-card brick/);
+  assert.match(markup, /card-count[^>]*>2</);
+});

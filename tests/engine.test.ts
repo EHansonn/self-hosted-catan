@@ -349,6 +349,35 @@ test("discard validates count; robber auto-steals a sole victim and asks among m
   assert.ok(choice.deadline! > Date.now() + 58000);
   invariant(choice);
 });
+
+test("discard history always reveals your cards and follows the table visibility setting", () => {
+  const cards = { ...emptyHand(), wood: 2, brick: 1 };
+  let visible = fresh();
+  visible.phase = "discard";
+  visible.discards = { p0: 3 };
+  grant(visible, "p0", cards);
+  visible = applyAction(visible, "p0", { type: "discard", cards });
+  assert.equal(
+    viewGame(visible, "p1").log.at(-1)?.text,
+    "Player 0 discards 2 wood and 1 brick.",
+  );
+
+  let anonymous = fresh();
+  anonymous.options.showDiscardedCards = false;
+  anonymous.phase = "discard";
+  anonymous.discards = { p0: 3 };
+  grant(anonymous, "p0", cards);
+  anonymous = applyAction(anonymous, "p0", { type: "discard", cards });
+  assert.equal(
+    viewGame(anonymous, "p0").log.at(-1)?.text,
+    "Player 0 discards 2 wood and 1 brick.",
+  );
+  assert.equal(
+    viewGame(anonymous, "p1").log.at(-1)?.text,
+    "Player 0 discards 3 cards.",
+  );
+  assert.ok(!("privateText" in viewGame(anonymous, "p0").log.at(-1)!));
+});
 test("bank trades and ports validate ratio, same-resource trades and empty banks", () => {
   let g = setup(fresh());
   g.phase = "main";

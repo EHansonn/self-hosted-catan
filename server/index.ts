@@ -626,6 +626,7 @@ const optionsSchema = z.object({
   friendlyRobber: z.boolean(),
   linkedTwoTwelve: z.boolean().default(false),
   paired: z.boolean(),
+  showDiscardedCards: z.boolean().default(true),
 });
 const resource = z.enum(["wood", "brick", "sheep", "wheat", "ore"]);
 const playerName = z

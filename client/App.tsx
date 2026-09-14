@@ -1459,6 +1459,16 @@ export function App() {
             <Link2 size={27} />
             <span><strong>Link 2 &amp; 12</strong><small>Either roll produces both numbers</small></span>
           </button>
+          <button
+            type="button"
+            className={`setup-choice horizontal ${room.options.showDiscardedCards ? "selected" : ""}`}
+            aria-pressed={room.options.showDiscardedCards}
+            disabled={!host || pending}
+            onClick={() => updateRoomOptions({ showDiscardedCards: !room.options.showDiscardedCards })}
+          >
+            <Eye size={27} />
+            <span><strong>Visible Discards</strong><small>Show the cards players return to the bank</small></span>
+          </button>
           {room.options.seats > 4 && (
             <button
               type="button"
@@ -2666,6 +2676,7 @@ export function App() {
                 {(room.options.discardTimer ?? DEFAULT_OPTIONS.discardTimer)
                   ? `${room.options.discardTimer ?? DEFAULT_OPTIONS.discardTimer}s discards`
                   : "Untimed discards"}
+                {room.options.showDiscardedCards ? " · visible discards" : " · anonymous discards"}
                 {room.options.linkedTwoTwelve ? " · 2 and 12 linked" : ""}
               </>
             ) : (

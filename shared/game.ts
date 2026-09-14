@@ -118,6 +118,7 @@ export interface Options {
   friendlyRobber: boolean;
   linkedTwoTwelve: boolean;
   paired: boolean;
+  showDiscardedCards: boolean;
 }
 export const DEFAULT_OPTIONS: Options = {
   seats: 4,
@@ -136,6 +137,7 @@ export const DEFAULT_OPTIONS: Options = {
   friendlyRobber: false,
   linkedTwoTwelve: false,
   paired: true,
+  showDiscardedCards: true,
 };
 export interface Tile {
   id: number;
@@ -1187,7 +1189,18 @@ function mutate(g: Game, id: string, a: Action) {
     );
     pay(g, p, a.cards);
     delete g.discards[id];
-    note(g, `${p.name} discards ${total(a.cards)} cards.`);
+    const publicText = `${p.name} discards ${total(a.cards)} cards.`;
+    const revealedText = `${p.name} discards ${RESOURCES
+      .filter((resource) => a.cards[resource] > 0)
+      .map((resource) => `${a.cards[resource]} ${resource}`)
+      .join(" and ")}.`;
+    note(
+      g,
+      g.options.showDiscardedCards ? revealedText : publicText,
+      "action",
+      undefined,
+      g.options.showDiscardedCards ? undefined : { [p.id]: revealedText },
+    );
     if (!Object.keys(g.discards).length) {
       g.phase = "robber";
       resetDeadline(g);
