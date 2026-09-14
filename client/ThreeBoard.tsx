@@ -7,6 +7,7 @@ import {
   harborLabelPosition,
   harborTransformForEdge,
 } from "./portOrientation";
+import { threeBoardStaticKey, threeBoardVisualKey } from "./threeBoardScene";
 
 type Stage = {
   scene: THREE.Scene;
@@ -14,16 +15,20 @@ type Stage = {
   renderer: THREE.WebGLRenderer;
   controls: OrbitControls;
   group: THREE.Group;
+  staticGroup: THREE.Group;
+  dynamicGroup: THREE.Group;
+  staticKey: string | null;
   dirty: boolean;
   textures: Map<string, THREE.Texture>;
-  targets: { element: HTMLElement; point: THREE.Vector3 }[];
+  staticTargets: { element: HTMLElement; point: THREE.Vector3 }[];
+  dynamicTargets: { element: HTMLElement; point: THREE.Vector3 }[];
   motions: {
     start: number;
     duration: number;
     update: (progress: number) => void;
   }[];
   lastAnimationId: string | null;
-  disposeGroup: () => void;
+  disposeGroup: (group: THREE.Group) => void;
   reset: () => void;
 };
 export default function ThreeBoard(props: BoardProps & { reset: number }) {
@@ -33,6 +38,7 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
   useEffect(() => {
     live.current = props;
   }, [props]);
+  const visualKey = threeBoardVisualKey(props);
   const [failed, setFailed] = useState(false);
   useEffect(() => {
     const el = container.current!;
@@ -79,10 +85,13 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
     sun.shadow.bias = -0.0005;
     scene.add(sun);
     const group = new THREE.Group();
+    const staticGroup = new THREE.Group();
+    const dynamicGroup = new THREE.Group();
+    group.add(staticGroup, dynamicGroup);
     scene.add(group);
     const textures = new Map<string, THREE.Texture>();
-    const disposeGroup = () => {
-      group.traverse((obj) => {
+    const disposeGroup = (target: THREE.Group) => {
+      target.traverse((obj) => {
         const mesh = obj as THREE.Mesh;
         if (mesh.geometry) mesh.geometry.dispose();
         if (mesh.material) {
@@ -91,12 +100,13 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
             : [mesh.material];
           materials.forEach((m) => {
             const map = (m as THREE.MeshStandardMaterial).map;
-            if (map && map.userData.label) map.dispose();
+            if (map && map.userData.label && !map.userData.persistent)
+              map.dispose();
             m.dispose();
           });
         }
       });
-      group.clear();
+      target.clear();
     };
     const reset = () => {
       const boardRadius = Math.max(
@@ -137,8 +147,12 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
       renderer,
       controls,
       group,
+      staticGroup,
+      dynamicGroup,
+      staticKey: null,
       textures,
-      targets: [],
+      staticTargets: [],
+      dynamicTargets: [],
       motions: [],
       lastAnimationId: null,
       dirty: true,
@@ -233,7 +247,10 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
       }
       if (state.dirty) {
         renderer.render(scene, camera);
-        for (const target of state.targets) {
+        for (const target of [
+          ...state.staticTargets,
+          ...state.dynamicTargets,
+        ]) {
           const p = target.point.clone().project(camera);
           target.element.style.left = `${((p.x + 1) / 2) * el.clientWidth}px`;
           target.element.style.top = `${((1 - p.y) / 2) * el.clientHeight}px`;
@@ -248,8 +265,11 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
       observer.disconnect();
       reducedMotion.removeEventListener("change", updateMotion);
       controls.dispose();
-      state.targets.forEach((t) => t.element.remove());
-      disposeGroup();
+      [...state.staticTargets, ...state.dynamicTargets].forEach((t) =>
+        t.element.remove(),
+      );
+      disposeGroup(staticGroup);
+      disposeGroup(dynamicGroup);
       textures.forEach((t) => t.dispose());
       renderer.dispose();
       renderer.domElement.removeEventListener("pointerdown", pointerDown);
@@ -267,9 +287,19 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
   useEffect(() => {
     const s = stage.current;
     if (!s) return;
-    s.disposeGroup();
-    s.targets.forEach((t) => t.element.remove());
-    s.targets = [];
+    const props = live.current;
+    const { board, players, robber, kind, highlights } = props;
+    const staticKey = threeBoardStaticKey(board);
+    const rebuildStatic = staticKey !== s.staticKey;
+    s.disposeGroup(s.dynamicGroup);
+    s.dynamicTargets.forEach((t) => t.element.remove());
+    s.dynamicTargets = [];
+    if (rebuildStatic) {
+      s.disposeGroup(s.staticGroup);
+      s.staticTargets.forEach((t) => t.element.remove());
+      s.staticTargets = [];
+      s.staticKey = staticKey;
+    }
     s.motions = [];
     const animation =
       props.animation &&
@@ -278,7 +308,6 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
         ? props.animation
         : null;
     if (animation) s.lastAnimationId = animation.id;
-    const { board, players, robber, kind, highlights } = props;
     const color = (id: string) =>
       players.find((p) => p.id === id)?.color || "#fff";
     const material = (color: string, extra = {}) =>
@@ -337,6 +366,7 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
       image.src = "/textures/terrain-atlas.png";
       return map;
     };
+    let renderGroup = s.dynamicGroup;
     const add = (
       geometry: THREE.BufferGeometry,
       mat: THREE.Material | THREE.Material[],
@@ -348,7 +378,7 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
       mesh.position.set(x, y, z);
       mesh.castShadow = true;
       mesh.receiveShadow = true;
-      s.group.add(mesh);
+      renderGroup.add(mesh);
       return mesh;
     };
     const animate = (
@@ -431,7 +461,7 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
       face.position.y = 0.247;
       face.rotation.x = -Math.PI / 2;
       token.add(face);
-      s.group.add(token);
+      renderGroup.add(token);
       return token;
     };
     const robberMarker = (x: number, z: number) => {
@@ -500,7 +530,7 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
       face.position.y = 0.274;
       face.rotation.x = -Math.PI / 2;
       marker.add(face);
-      s.group.add(marker);
+      renderGroup.add(marker);
       return marker;
     };
     const portColor = (resource: (typeof board.ports)[number]["resource"]) =>
@@ -549,6 +579,7 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
       const map = new THREE.CanvasTexture(canvas);
       map.colorSpace = THREE.SRGBColorSpace;
       map.userData.label = true;
+      map.userData.persistent = true;
       map.anisotropy = Math.min(8, s.renderer.capabilities.getMaxAnisotropy());
       s.textures.set(textureKey, map);
 
@@ -593,7 +624,7 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
       const harbor = new THREE.Group();
       harbor.position.set(centerX, 0, centerZ);
       harbor.rotation.y = rotationY;
-      s.group.add(harbor);
+      renderGroup.add(harbor);
       const portAdd = (
         geometry: THREE.BufferGeometry,
         mat: THREE.Material | THREE.Material[],
@@ -700,7 +731,7 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
         `${portName} harbor, trade ${resource === "any" ? "3:1" : "2:1"}`,
       );
       container.current!.appendChild(description);
-      s.targets.push({
+      s.staticTargets.push({
         element: description,
         point: new THREE.Vector3(
           badgePosition.x,
@@ -709,70 +740,77 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
         ),
       });
     };
-    const boardRadius = Math.max(
-      ...board.vertices.map((vertex) => Math.hypot(vertex.x, vertex.y)),
-    );
-    const seaRadius = boardRadius + 1.45;
-    const sea = add(
-      new THREE.CylinderGeometry(
-        seaRadius - 0.05,
-        seaRadius,
-        0.22,
-        64,
-      ),
-      material("#347ab0", { metalness: 0.05, roughness: 0.72 }),
-      0,
-      -0.28,
-      0,
-    );
-    sea.receiveShadow = true;
+    if (rebuildStatic) {
+      renderGroup = s.staticGroup;
+      const boardRadius = Math.max(
+        ...board.vertices.map((vertex) => Math.hypot(vertex.x, vertex.y)),
+      );
+      const seaRadius = boardRadius + 1.45;
+      const sea = add(
+        new THREE.CylinderGeometry(
+          seaRadius - 0.05,
+          seaRadius,
+          0.22,
+          64,
+        ),
+        material("#347ab0", { metalness: 0.05, roughness: 0.72 }),
+        0,
+        -0.28,
+        0,
+      );
+      sea.receiveShadow = true;
+    }
     for (const tile of board.tiles) {
-      const map = terrainTexture(tile.terrain);
-      add(
-        new THREE.CylinderGeometry(0.99, 0.99, 0.27, 6),
-        material("#bb9965"),
-        tile.x,
-        -0.01,
-        tile.y,
-      );
-      const shape = new THREE.Shape();
-      for (let k = 0; k < 6; k++) {
-        const a = ((30 + k * 60) * Math.PI) / 180;
-        const x = Math.cos(a) * 0.97,
-          y = Math.sin(a) * 0.97;
-        if (k === 0) shape.moveTo(x, y);
-        else shape.lineTo(x, y);
+      const map = rebuildStatic ? terrainTexture(tile.terrain) : null;
+      if (rebuildStatic) {
+        renderGroup = s.staticGroup;
+        add(
+          new THREE.CylinderGeometry(0.99, 0.99, 0.27, 6),
+          material("#bb9965"),
+          tile.x,
+          -0.01,
+          tile.y,
+        );
+        const shape = new THREE.Shape();
+        for (let k = 0; k < 6; k++) {
+          const a = ((30 + k * 60) * Math.PI) / 180;
+          const x = Math.cos(a) * 0.97,
+            y = Math.sin(a) * 0.97;
+          if (k === 0) shape.moveTo(x, y);
+          else shape.lineTo(x, y);
+        }
+        shape.closePath();
+        const geo = new THREE.ShapeGeometry(shape);
+        const uv = geo.attributes.uv;
+        for (let i = 0; i < uv.count; i++)
+          uv.setXY(i, (uv.getX(i) + 1) / 2, (uv.getY(i) + 1) / 2);
+        const top = add(
+          geo,
+          material("#ffffff", {
+            map: map!,
+            bumpMap: map!,
+            bumpScale: 0.04,
+            emissive: "#ffffff",
+            emissiveMap: map!,
+            emissiveIntensity: 0.08,
+            side: THREE.DoubleSide,
+          }),
+          tile.x,
+          0.14,
+          tile.y,
+        );
+        top.rotation.x = -Math.PI / 2;
+        const animationAnchor = document.createElement("span");
+        animationAnchor.className = "three-animation-anchor";
+        animationAnchor.dataset.animationTile = String(tile.id);
+        animationAnchor.setAttribute("aria-hidden", "true");
+        container.current!.appendChild(animationAnchor);
+        s.staticTargets.push({
+          element: animationAnchor,
+          point: new THREE.Vector3(tile.x, 0.32, tile.y),
+        });
       }
-      shape.closePath();
-      const geo = new THREE.ShapeGeometry(shape);
-      const uv = geo.attributes.uv;
-      for (let i = 0; i < uv.count; i++)
-        uv.setXY(i, (uv.getX(i) + 1) / 2, (uv.getY(i) + 1) / 2);
-      const top = add(
-        geo,
-        material("#ffffff", {
-          map,
-          bumpMap: map,
-          bumpScale: 0.04,
-          emissive: "#ffffff",
-          emissiveMap: map,
-          emissiveIntensity: 0.08,
-          side: THREE.DoubleSide,
-        }),
-        tile.x,
-        0.14,
-        tile.y,
-      );
-      top.rotation.x = -Math.PI / 2;
-      const animationAnchor = document.createElement("span");
-      animationAnchor.className = "three-animation-anchor";
-      animationAnchor.dataset.animationTile = String(tile.id);
-      animationAnchor.setAttribute("aria-hidden", "true");
-      container.current!.appendChild(animationAnchor);
-      s.targets.push({
-        element: animationAnchor,
-        point: new THREE.Vector3(tile.x, 0.32, tile.y),
-      });
+      renderGroup = s.dynamicGroup;
       if (animation?.rolledTiles.includes(tile.id)) {
         const glowMaterial = new THREE.MeshBasicMaterial({
           color: "#fff29b",
@@ -795,49 +833,61 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
           glow.position.y = 0.185 + wave * 0.08;
         });
       }
-      // Small textured terrain features leave the token and all six build corners clear.
-      if (tile.terrain === "wood") {
-        for (const [dx, dz, h] of [
-          [-0.5, -0.3, 0.36],
-          [-0.2, -0.58, 0.44],
-          [0.28, -0.5, 0.32],
-          [0.55, 0.2, 0.38],
-          [-0.45, 0.42, 0.3],
-        ]) {
-          add(
-            new THREE.CylinderGeometry(0.025, 0.04, 0.2, 6),
-            material("#6d5131"),
-            tile.x + dx,
-            0.22,
-            tile.y + dz,
-          );
-          add(
-            new THREE.ConeGeometry(0.17, h, 7),
-            material("#77956a", { map }),
-            tile.x + dx,
-            0.3 + h / 2,
-            tile.y + dz,
-          );
+      if (rebuildStatic) {
+        renderGroup = s.staticGroup;
+        // Small textured terrain features leave the token and all six build corners clear.
+        if (tile.terrain === "wood") {
+          for (const [dx, dz, h] of [
+            [-0.5, -0.3, 0.36],
+            [-0.2, -0.58, 0.44],
+            [0.28, -0.5, 0.32],
+            [0.55, 0.2, 0.38],
+            [-0.45, 0.42, 0.3],
+          ]) {
+            add(
+              new THREE.CylinderGeometry(0.025, 0.04, 0.2, 6),
+              material("#6d5131"),
+              tile.x + dx,
+              0.22,
+              tile.y + dz,
+            );
+            add(
+              new THREE.ConeGeometry(0.17, h, 7),
+              material("#77956a", { map: map! }),
+              tile.x + dx,
+              0.3 + h / 2,
+              tile.y + dz,
+            );
+          }
+        } else if (tile.terrain === "ore") {
+          for (const [dx, dz, h] of [
+            [-0.4, -0.37, 0.5],
+            [0.05, -0.52, 0.66],
+            [0.45, -0.27, 0.36],
+          ]) {
+            const rock = add(
+              new THREE.ConeGeometry(0.28, h, 5),
+              material("#bbc3c3", { map: map!, flatShading: true }),
+              tile.x + dx,
+              0.14 + h / 2,
+              tile.y + dz,
+            );
+            rock.rotation.y = tile.id * 0.8 + dx;
+          }
         }
-      } else if (tile.terrain === "ore") {
-        for (const [dx, dz, h] of [
-          [-0.4, -0.37, 0.5],
-          [0.05, -0.52, 0.66],
-          [0.45, -0.27, 0.36],
-        ]) {
-          const rock = add(
-            new THREE.ConeGeometry(0.28, h, 5),
-            material("#bbc3c3", { map, flatShading: true }),
-            tile.x + dx,
-            0.14 + h / 2,
-            tile.y + dz,
-          );
-          rock.rotation.y = tile.id * 0.8 + dx;
-        }
+        if (tile.number) numberToken(tile.number, tile.x, tile.y);
       }
+      renderGroup = s.dynamicGroup;
       if (kind === "tile" && highlights.includes(tile.id)) {
-        top.userData.pick = tile.id;
         const selected = props.selected === tile.id;
+        const hit = add(
+          new THREE.CylinderGeometry(0.83, 0.83, 0.08, 6),
+          new THREE.MeshBasicMaterial({ visible: false }),
+          tile.x,
+          0.22,
+          tile.y,
+        );
+        hit.userData.pick = tile.id;
         const shadow = add(
           new THREE.RingGeometry(
             selected ? 0.38 : 0.4,
@@ -902,7 +952,6 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
         markerRim.renderOrder = 21;
         markerRim.userData.pick = tile.id;
       }
-      if (tile.number) numberToken(tile.number, tile.x, tile.y);
       if (tile.id === robber) {
         const marker = robberMarker(tile.x + 0.43, tile.y + 0.22);
         if (animation?.robber?.to === tile.id) {
@@ -927,8 +976,12 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
         }
       }
     }
-    for (const port of board.ports)
-      addPortModel(board.edges[port.edge], port.resource);
+    if (rebuildStatic) {
+      renderGroup = s.staticGroup;
+      for (const port of board.ports)
+        addPortModel(board.edges[port.edge], port.resource);
+    }
+    renderGroup = s.dynamicGroup;
     for (const e of board.edges) {
       const enabled = kind === "edge" && highlights.includes(e.id);
       const contextual = !!props.buildOptions?.road.includes(e.id);
@@ -1080,10 +1133,10 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
       element.title = element.getAttribute("aria-label")!;
       element.onclick = () => live.current.onPick(id);
       container.current!.appendChild(element);
-      s.targets.push({ element, point: new THREE.Vector3(x, 0.3, z) });
+      s.dynamicTargets.push({ element, point: new THREE.Vector3(x, 0.3, z) });
     }
     s.dirty = true;
-  }, [props]);
+  }, [visualKey]);
   return (
     <div
       className="three-board"
