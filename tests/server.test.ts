@@ -5,7 +5,15 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { io, type Socket } from "socket.io-client";
-import { COLORS, DEFAULT_OPTIONS, makeBoard, type RoomView, type ResumeRoomView, type Action } from "../shared/game";
+import {
+  COLORS,
+  DEFAULT_OPTIONS,
+  makeBoard,
+  mapGenerationRules,
+  type RoomView,
+  type ResumeRoomView,
+  type Action,
+} from "../shared/game";
 import type { CommunityView } from "../shared/community";
 type LiveRoomView = RoomView & { paused: boolean };
 const key = "test-only-crossroads-key",
@@ -306,6 +314,21 @@ test("packaged server: guest joins, creator-only rooms, scaled tables, privacy, 
       (await clients[2].cmd({ type: "color", color: "not-a-color" })).ok,
       false,
     );
+    const customMapOptions = {
+      ...host.state!.options,
+      allowSixEightTouch: false,
+      allowTwoTwelveTouch: false,
+      allowSameNumbersTouch: false,
+      allowSameResourcesTouch: false,
+    };
+    assert.equal(
+      (await clients[1].cmd({ type: "options", options: customMapOptions })).ok,
+      false,
+    );
+    assert.ok(
+      (await host.cmd({ type: "options", options: customMapOptions })).ok,
+    );
+    assert.deepEqual(host.state!.options, customMapOptions);
     const initialMapSeed = host.state!.mapSeed;
     assert.equal(clients[1].state!.mapSeed, initialMapSeed);
     assert.equal(
@@ -321,7 +344,11 @@ test("packaged server: guest joins, creator-only rooms, scaled tables, privacy, 
     assert.notEqual(selectedMapSeed, initialMapSeed);
     await clients[1].cmd({ type: "sync" });
     assert.equal(clients[1].state!.mapSeed, selectedMapSeed);
-    const previewBoard = makeBoard(6, selectedMapSeed, true);
+    const previewBoard = makeBoard(
+      6,
+      selectedMapSeed,
+      mapGenerationRules(customMapOptions),
+    );
     const seatedIds = host.state!.players.map((player) => player.id).sort();
     assert.equal((await clients[1].cmd({ type: "start" })).ok, false);
     assert.ok((await host.cmd({ type: "start" })).ok);

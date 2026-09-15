@@ -27,6 +27,7 @@ import {
   MIN_PLAYERS,
   MAX_PLAYERS,
   makeBoard,
+  mapGenerationRules,
   makePlayer,
   randomPlayerOrder,
   createGame,
@@ -623,6 +624,10 @@ const optionsSchema = z.object({
     z.literal(60),
   ]).default(20),
   balanced: z.boolean(),
+  allowSixEightTouch: z.boolean().default(false),
+  allowTwoTwelveTouch: z.boolean().default(true),
+  allowSameNumbersTouch: z.boolean().default(true),
+  allowSameResourcesTouch: z.boolean().default(false),
   friendlyRobber: z.boolean(),
   linkedTwoTwelve: z.boolean().default(false),
   paired: z.boolean(),
@@ -1253,7 +1258,7 @@ io.on("connection", (socket) => {
         const options = optionsSchema.parse(command.options);
         if (options.seats < r.players.length)
           fail("Remove extra players before reducing the seats.");
-        makeBoard(options.seats, r.mapSeed, options.balanced);
+        makeBoard(options.seats, r.mapSeed, mapGenerationRules(options));
         r.options = options;
         r.players
           .filter((p) => p.bot)
@@ -1276,7 +1281,11 @@ io.on("connection", (socket) => {
               : (candidate + step) >>> 0;
           if (candidate === r.mapSeed) continue;
           try {
-            makeBoard(r.options.seats, candidate, r.options.balanced);
+            makeBoard(
+              r.options.seats,
+              candidate,
+              mapGenerationRules(r.options),
+            );
             r.mapSeed = candidate;
             changed(r);
             return ack({ ok: true });

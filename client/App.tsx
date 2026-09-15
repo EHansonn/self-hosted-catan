@@ -96,6 +96,7 @@ import {
   COSTS,
   boardProfileForPlayers,
   makeBoard,
+  mapGenerationRules,
   emptyHand,
   total,
 } from "../shared/game";
@@ -985,9 +986,38 @@ export function App() {
   const lobbySeats = room?.options.seats ?? DEFAULT_OPTIONS.seats;
   const lobbyMapSeed = room?.mapSeed ?? 2026;
   const lobbyBalanced = room?.options.balanced ?? DEFAULT_OPTIONS.balanced;
+  const lobbyAllowSixEightTouch =
+    room?.options.allowSixEightTouch ??
+    DEFAULT_OPTIONS.allowSixEightTouch;
+  const lobbyAllowTwoTwelveTouch =
+    room?.options.allowTwoTwelveTouch ??
+    DEFAULT_OPTIONS.allowTwoTwelveTouch;
+  const lobbyAllowSameNumbersTouch =
+    room?.options.allowSameNumbersTouch ??
+    DEFAULT_OPTIONS.allowSameNumbersTouch;
+  const lobbyAllowSameResourcesTouch =
+    room?.options.allowSameResourcesTouch ??
+    DEFAULT_OPTIONS.allowSameResourcesTouch;
+  const lobbyMapRules = useMemo(
+    () =>
+      mapGenerationRules({
+        balanced: lobbyBalanced,
+        allowSixEightTouch: lobbyAllowSixEightTouch,
+        allowTwoTwelveTouch: lobbyAllowTwoTwelveTouch,
+        allowSameNumbersTouch: lobbyAllowSameNumbersTouch,
+        allowSameResourcesTouch: lobbyAllowSameResourcesTouch,
+      }),
+    [
+      lobbyAllowSameNumbersTouch,
+      lobbyAllowSameResourcesTouch,
+      lobbyAllowSixEightTouch,
+      lobbyAllowTwoTwelveTouch,
+      lobbyBalanced,
+    ],
+  );
   const generatedBoard = useMemo(
-    () => makeBoard(lobbySeats, lobbyMapSeed, lobbyBalanced),
-    [lobbyBalanced, lobbyMapSeed, lobbySeats],
+    () => makeBoard(lobbySeats, lobbyMapSeed, lobbyMapRules),
+    [lobbyMapRules, lobbyMapSeed, lobbySeats],
   );
   const board = game?.board || generatedBoard;
   const boardPlayers = room?.players || [];
@@ -1375,7 +1405,7 @@ export function App() {
             onClick={() => updateRoomOptions({ balanced: true })}
           >
             <Dices size={28} />
-            <span><strong>Balanced Island</strong><small>Keep red numbers apart</small></span>
+            <span><strong>Balanced Island</strong><small>Customize neighboring tiles</small></span>
           </button>
           <button
             type="button"
@@ -1388,6 +1418,80 @@ export function App() {
             <span><strong>Random Island</strong><small>Shuffle every tile and number</small></span>
           </button>
         </div>
+        <section
+          className={`map-generation-rules ${room.options.balanced ? "" : "is-disabled"}`}
+          aria-labelledby="map-generation-rules-title"
+        >
+          <div className="map-generation-rules-heading">
+            <Settings2 size={21} aria-hidden="true" />
+            <span>
+              <strong id="map-generation-rules-title">Generation rules</strong>
+              <small>
+                {room.options.balanced
+                  ? "Choose which neighboring tiles are allowed."
+                  : "Select Balanced Island to use these rules."}
+              </small>
+            </span>
+          </div>
+          <div className="map-generation-rules-grid">
+            <label className="map-generation-rule">
+              <span>
+                <strong>6 &amp; 8 can touch</strong>
+                <small>Allow red numbers to share an edge.</small>
+              </span>
+              <Switch
+                checked={room.options.allowSixEightTouch}
+                disabled={!host || pending || !room.options.balanced}
+                onCheckedChange={(checked) =>
+                  updateRoomOptions({ allowSixEightTouch: checked })
+                }
+                aria-label="6 and 8 can touch"
+              />
+            </label>
+            <label className="map-generation-rule">
+              <span>
+                <strong>2 &amp; 12 can touch</strong>
+                <small>Allow rare numbers to share an edge.</small>
+              </span>
+              <Switch
+                checked={room.options.allowTwoTwelveTouch}
+                disabled={!host || pending || !room.options.balanced}
+                onCheckedChange={(checked) =>
+                  updateRoomOptions({ allowTwoTwelveTouch: checked })
+                }
+                aria-label="2 and 12 can touch"
+              />
+            </label>
+            <label className="map-generation-rule">
+              <span>
+                <strong>Same numbers can touch</strong>
+                <small>Allow matching number tokens together.</small>
+              </span>
+              <Switch
+                checked={room.options.allowSameNumbersTouch}
+                disabled={!host || pending || !room.options.balanced}
+                onCheckedChange={(checked) =>
+                  updateRoomOptions({ allowSameNumbersTouch: checked })
+                }
+                aria-label="Same numbers can touch"
+              />
+            </label>
+            <label className="map-generation-rule">
+              <span>
+                <strong>Same resources can touch</strong>
+                <small>Allow matching terrain types together.</small>
+              </span>
+              <Switch
+                checked={room.options.allowSameResourcesTouch}
+                disabled={!host || pending || !room.options.balanced}
+                onCheckedChange={(checked) =>
+                  updateRoomOptions({ allowSameResourcesTouch: checked })
+                }
+                aria-label="Same resources can touch"
+              />
+            </label>
+          </div>
+        </section>
         <div className="map-preview-card">
           <BoardPreview board={board} seed={room.mapSeed} />
           <div className="map-seed-controls">

@@ -101,7 +101,25 @@ export const emptyHand = (): Hand => ({
 });
 export const total = (h: Partial<Hand>) =>
   RESOURCES.reduce((n, r) => n + (h[r] || 0), 0);
-export interface Options {
+export interface MapGenerationRules {
+  allowSixEightTouch: boolean;
+  allowTwoTwelveTouch: boolean;
+  allowSameNumbersTouch: boolean;
+  allowSameResourcesTouch: boolean;
+}
+export const DEFAULT_MAP_GENERATION_RULES: MapGenerationRules = {
+  allowSixEightTouch: false,
+  allowTwoTwelveTouch: true,
+  allowSameNumbersTouch: true,
+  allowSameResourcesTouch: false,
+};
+const RANDOM_MAP_GENERATION_RULES: MapGenerationRules = {
+  allowSixEightTouch: true,
+  allowTwoTwelveTouch: true,
+  allowSameNumbersTouch: true,
+  allowSameResourcesTouch: true,
+};
+export interface Options extends MapGenerationRules {
   seats: number;
   target: number;
   difficulty: Difficulty;
@@ -134,11 +152,31 @@ export const DEFAULT_OPTIONS: Options = {
   actionTimer: 10,
   discardTimer: 20,
   balanced: true,
+  ...DEFAULT_MAP_GENERATION_RULES,
   friendlyRobber: false,
   linkedTwoTwelve: false,
   paired: true,
   showDiscardedCards: true,
 };
+export function mapGenerationRules(
+  options: Pick<Options, "balanced"> & Partial<MapGenerationRules>,
+): MapGenerationRules {
+  if (!options.balanced) return { ...RANDOM_MAP_GENERATION_RULES };
+  return {
+    allowSixEightTouch:
+      options.allowSixEightTouch ??
+      DEFAULT_MAP_GENERATION_RULES.allowSixEightTouch,
+    allowTwoTwelveTouch:
+      options.allowTwoTwelveTouch ??
+      DEFAULT_MAP_GENERATION_RULES.allowTwoTwelveTouch,
+    allowSameNumbersTouch:
+      options.allowSameNumbersTouch ??
+      DEFAULT_MAP_GENERATION_RULES.allowSameNumbersTouch,
+    allowSameResourcesTouch:
+      options.allowSameResourcesTouch ??
+      DEFAULT_MAP_GENERATION_RULES.allowSameResourcesTouch,
+  };
+}
 export interface Tile {
   id: number;
   x: number;
@@ -425,6 +463,85 @@ function numberBag(length: number) {
   return counts.flatMap(({ value, count }) => Array<number>(count).fill(value));
 }
 
+function arrangeByNeighborRules<T extends string | number>(
+  tileIds: number[],
+  values: T[],
+  neighboringTiles: Map<number, Set<number>>,
+  canTouch: (left: T, right: T) => boolean,
+  random: { rng: number },
+  description: string,
+) {
+  const positions = new Map(tileIds.map((tileId, index) => [tileId, index]));
+  const pairs: [number, number][] = [];
+  for (const tileId of tileIds)
+    for (const neighborId of neighboringTiles.get(tileId) || []) {
+      const left = positions.get(tileId);
+      const right = positions.get(neighborId);
+      if (left !== undefined && right !== undefined && left < right)
+        pairs.push([left, right]);
+    }
+  const incidentPairs = tileIds.map(() => [] as number[]);
+  pairs.forEach(([left, right], pairIndex) => {
+    incidentPairs[left].push(pairIndex);
+    incidentPairs[right].push(pairIndex);
+  });
+  for (let attempt = 0; attempt < 96; attempt++) {
+    const arranged = shuffle(values, random);
+    for (let step = 0; step < Math.max(100, tileIds.length * 8); step++) {
+      const conflicts = pairs.flatMap(([left, right], pairIndex) =>
+        canTouch(arranged[left], arranged[right]) ? [] : [pairIndex],
+      );
+      if (!conflicts.length) return arranged;
+      const conflict =
+        pairs[conflicts[Math.floor(rng(random) * conflicts.length)]];
+      const endpoints = rng(random) < 0.5
+        ? conflict
+        : ([conflict[1], conflict[0]] as [number, number]);
+      let bestDelta = 0;
+      let bestSwap: [number, number] | null = null;
+      for (const left of endpoints)
+        for (let right = 0; right < arranged.length; right++) {
+          if (left === right || arranged[left] === arranged[right]) continue;
+          const affectedPairs = new Set([
+            ...incidentPairs[left],
+            ...incidentPairs[right],
+          ]);
+          let before = 0;
+          let after = 0;
+          for (const pairIndex of affectedPairs) {
+            const [a, b] = pairs[pairIndex];
+            if (!canTouch(arranged[a], arranged[b])) before++;
+            const nextA = a === left
+              ? arranged[right]
+              : a === right
+                ? arranged[left]
+                : arranged[a];
+            const nextB = b === left
+              ? arranged[right]
+              : b === right
+                ? arranged[left]
+                : arranged[b];
+            if (!canTouch(nextA, nextB)) after++;
+          }
+          const delta = after - before;
+          if (
+            delta < bestDelta ||
+            (delta === bestDelta && delta < 0 && rng(random) < 0.5)
+          ) {
+            bestDelta = delta;
+            bestSwap = [left, right];
+          }
+        }
+      if (!bestSwap) break;
+      [arranged[bestSwap[0]], arranged[bestSwap[1]]] = [
+        arranged[bestSwap[1]],
+        arranged[bestSwap[0]],
+      ];
+    }
+  }
+  throw new Error(`Unable to create an island with ${description}.`);
+}
+
 function developmentDeck(playerCount: number): Dev[] {
   if (playerCount <= 4)
     return [
@@ -455,8 +572,19 @@ function developmentDeck(playerCount: number): Dev[] {
   ];
 }
 
-export function makeBoard(playerCount = 4, seed = 42, balanced = true): Board {
+export function makeBoard(
+  playerCount = 4,
+  seed = 42,
+  generation: boolean | Partial<MapGenerationRules> =
+    DEFAULT_MAP_GENERATION_RULES,
+): Board {
   const random = { rng: seed };
+  const rules =
+    typeof generation === "boolean"
+      ? generation
+        ? DEFAULT_MAP_GENERATION_RULES
+        : RANDOM_MAP_GENERATION_RULES
+      : { ...DEFAULT_MAP_GENERATION_RULES, ...generation };
   const profile = boardProfileForPlayers(playerCount);
   const rows = profile.rows;
   const desertCount = Math.max(1, Math.round(profile.tiles / 19));
@@ -532,48 +660,60 @@ export function makeBoard(playerCount = 4, seed = 42, balanced = true): Board {
       board.tiles.push(tile);
     }
   });
+  const neighboringTiles = new Map<number, Set<number>>(
+    board.tiles.map((tile) => [tile.id, new Set<number>()]),
+  );
+  for (const edge of board.edges)
+    if (edge.tiles.length === 2) {
+      neighboringTiles.get(edge.tiles[0])!.add(edge.tiles[1]);
+      neighboringTiles.get(edge.tiles[1])!.add(edge.tiles[0]);
+    }
+  if (!rules.allowSameResourcesTouch) {
+    const arrangedTerrains = arrangeByNeighborRules(
+      board.tiles.map((tile) => tile.id),
+      terrains,
+      neighboringTiles,
+      (left, right) =>
+        left === "desert" || right === "desert" || left !== right,
+      random,
+      "matching resources separated",
+    );
+    board.tiles.forEach(
+      (tile, index) => (tile.terrain = arrangedTerrains[index]),
+    );
+  }
   const nums = numberBag(productiveCount);
   const productiveTiles = board.tiles.filter((tile) => tile.terrain !== "desert");
-  if (!balanced) {
-    const numbers = shuffle(nums, random);
-    productiveTiles.forEach((tile, index) => (tile.number = numbers[index]));
-  } else {
-    const neighboringTiles = new Map<number, Set<number>>(
-      board.tiles.map((tile) => [tile.id, new Set<number>()]),
-    );
-    for (const edge of board.edges)
-      if (edge.tiles.length === 2) {
-        neighboringTiles.get(edge.tiles[0])!.add(edge.tiles[1]);
-        neighboringTiles.get(edge.tiles[1])!.add(edge.tiles[0]);
-      }
-    const reds = nums.filter((number) => number === 6 || number === 8);
-    const others = nums.filter((number) => number !== 6 && number !== 8);
-    let redTileIds: number[] = [];
-    for (let attempt = 0; attempt < 1000 && redTileIds.length < reds.length; attempt++) {
-      redTileIds = [];
-      for (const tile of shuffle(productiveTiles, random)) {
-        if (
-          redTileIds.every(
-            (selected) => !neighboringTiles.get(selected)!.has(tile.id),
+  const numberRulesEnabled =
+    !rules.allowSixEightTouch ||
+    !rules.allowTwoTwelveTouch ||
+    !rules.allowSameNumbersTouch;
+  const numbers = numberRulesEnabled
+    ? arrangeByNeighborRules(
+        productiveTiles.map((tile) => tile.id),
+        nums,
+        neighboringTiles,
+        (left, right) => {
+          if (!rules.allowSameNumbersTouch && left === right) return false;
+          if (
+            !rules.allowSixEightTouch &&
+            [6, 8].includes(left) &&
+            [6, 8].includes(right)
           )
-        )
-          redTileIds.push(tile.id);
-        if (redTileIds.length === reds.length) break;
-      }
-    }
-    if (redTileIds.length < reds.length)
-      throw new Error("Unable to create a balanced island for this table size.");
-    const redSet = new Set(redTileIds);
-    const shuffledReds = shuffle(reds, random);
-    const shuffledOthers = shuffle(others, random);
-    let redIndex = 0;
-    let otherIndex = 0;
-    productiveTiles.forEach((tile) => {
-      tile.number = redSet.has(tile.id)
-        ? shuffledReds[redIndex++]
-        : shuffledOthers[otherIndex++];
-    });
-  }
+            return false;
+          if (
+            !rules.allowTwoTwelveTouch &&
+            [2, 12].includes(left) &&
+            [2, 12].includes(right)
+          )
+            return false;
+          return true;
+        },
+        random,
+        "the selected number rules",
+      )
+    : shuffle(nums, random);
+  productiveTiles.forEach((tile, index) => (tile.number = numbers[index]));
   const coast = board.edges
     .filter((e) => e.tiles.length === 1)
     .sort((a, b) => {
@@ -629,7 +769,7 @@ export function createGame(
 ): Game {
   const gameOptions = { ...DEFAULT_OPTIONS, ...options };
   const g: Game = {
-    board: makeBoard(players.length, seed, gameOptions.balanced),
+    board: makeBoard(players.length, seed, mapGenerationRules(gameOptions)),
     players: structuredClone(players).map((p) => ({
       ...p,
       resources: emptyHand(),

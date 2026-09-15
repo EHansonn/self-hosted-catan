@@ -7,6 +7,7 @@ import {
   createGame,
   makePlayer,
   DEFAULT_OPTIONS,
+  mapGenerationRules,
   applyAction,
   RESOURCES,
   type Game,
@@ -100,7 +101,11 @@ function clearResources(g: Game, id: string) {
     player.resources[resource] = 0;
   }
 }
-test("boards scale from 2–12 players with valid topology, number bags, balanced red numbers and ports", () => {
+test("boards scale from 2–12 players with valid topology, separated defaults and ports", () => {
+  assert.equal(DEFAULT_OPTIONS.allowSixEightTouch, false);
+  assert.equal(DEFAULT_OPTIONS.allowTwoTwelveTouch, true);
+  assert.equal(DEFAULT_OPTIONS.allowSameNumbersTouch, true);
+  assert.equal(DEFAULT_OPTIONS.allowSameResourcesTouch, false);
   const expected = new Map([
     [2, { tiles: 19, deserts: 1, ports: 9 }],
     [4, { tiles: 19, deserts: 1, ports: 9 }],
@@ -136,6 +141,14 @@ test("boards scale from 2–12 players with valid topology, number bags, balance
         ),
       );
       assert.ok(
+        b.edges.every(
+          (e) =>
+            e.tiles.length < 2 ||
+            e.tiles.some((id) => b.tiles[id].terrain === "desert") ||
+            b.tiles[e.tiles[0]].terrain !== b.tiles[e.tiles[1]].terrain,
+        ),
+      );
+      assert.ok(
         b.vertices.every((v) => v.edges.length >= 2 && v.edges.length <= 3),
       );
       const portCorners = b.ports.flatMap((p) => [
@@ -144,6 +157,50 @@ test("boards scale from 2–12 players with valid topology, number bags, balance
       ]);
       assert.equal(new Set(portCorners).size, portCorners.length);
     }
+});
+test("map generation honors every neighboring-tile rule", () => {
+  const strictRules = {
+    allowSixEightTouch: false,
+    allowTwoTwelveTouch: false,
+    allowSameNumbersTouch: false,
+    allowSameResourcesTouch: false,
+  };
+  for (const players of [2, 6, 8, 10, 12])
+    for (let seed = 1; seed <= 12; seed++) {
+      const board = makeBoard(players, seed, strictRules);
+      for (const edge of board.edges) {
+        if (edge.tiles.length < 2) continue;
+        const [left, right] = edge.tiles.map((id) => board.tiles[id]);
+        assert.ok(
+          left.terrain === "desert" ||
+            right.terrain === "desert" ||
+            left.terrain !== right.terrain,
+        );
+        assert.ok(
+          !([6, 8].includes(left.number) && [6, 8].includes(right.number)),
+        );
+        assert.ok(
+          !(
+            [2, 12].includes(left.number) &&
+            [2, 12].includes(right.number)
+          ),
+        );
+        assert.ok(
+          left.number === 0 ||
+            right.number === 0 ||
+            left.number !== right.number,
+        );
+      }
+    }
+  assert.deepEqual(
+    mapGenerationRules({ ...DEFAULT_OPTIONS, balanced: false }),
+    {
+      allowSixEightTouch: true,
+      allowTwoTwelveTouch: true,
+      allowSameNumbersTouch: true,
+      allowSameResourcesTouch: true,
+    },
+  );
 });
 test("snake setup gives two settlements, two roads and resources only from second placement", () => {
   let g = fresh(6);
