@@ -21,6 +21,7 @@ import {
   robberSites,
   points,
   finalGameResults,
+  gameRuntimeMs,
   roadLength,
   viewGame,
   ratios,
@@ -1134,9 +1135,13 @@ test("a player may only win on their own primary or paired turn", () => {
   g = applyAction(g, "p0", { type: "end" });
   assert.equal(g.winner, "p3");
   assert.equal(g.phase, "finished");
+  assert.ok(g.finishedAt! >= g.startedAt);
 });
 test("final results account for every victory point source", () => {
   const g = fresh();
+  g.startedAt = 1_000;
+  g.finishedAt = 3_666_000;
+  g.pausedMs = 65_000;
   g.board.vertices.forEach((vertex) => {
     vertex.owner = null;
     vertex.city = false;
@@ -1156,6 +1161,7 @@ test("final results account for every victory point source", () => {
   assert.equal(results.roomCode, "ABC123");
   assert.equal(results.winnerId, "p0");
   assert.equal(results.official, true);
+  assert.equal(results.durationMs, 3_600_000);
   assert.deepEqual(results.players[0], {
     id: "p0",
     name: "Player 0",
@@ -1169,6 +1175,14 @@ test("final results account for every victory point source", () => {
     total: 11,
   });
   assert.equal(points(g, g.players[0]), results.players[0].total);
+});
+test("game runtime excludes an active host pause", () => {
+  const g = fresh();
+  g.startedAt = 1_000;
+  g.finishedAt = null;
+  g.pausedMs = 500;
+  g.pausedAt = 3_000;
+  assert.equal(gameRuntimeMs(g, 10_000), 1_500);
 });
 test("complete bot matches finish legally across every supported table size and difficulty", () => {
   const cases = [

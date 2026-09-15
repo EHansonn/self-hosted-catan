@@ -35,6 +35,7 @@ import {
   Shuffle,
   Sparkles,
   Sun,
+  Timer,
   Trophy,
   Users,
   Volume2,
@@ -65,6 +66,7 @@ import {
   type ResourceChoiceDevelopmentCard,
 } from "./developmentCards";
 import { GameplayEffects } from "./GameplayEffects";
+import { formatGameDuration } from "./duration";
 import {
   deriveGameplayAnimation,
   type GameplayAnimationCue,
@@ -2391,6 +2393,14 @@ export function App() {
                     ? `Official game ${gameResults.roomCode}. The winner earned a sheep to name.`
                     : `Friendly game ${gameResults.roomCode}. Games need at least three human players at the start to count.`}
                 </p>
+                <div
+                  className="game-results-runtime"
+                  aria-label={`Total game time ${formatGameDuration(gameResults.durationMs)}`}
+                >
+                  <Timer aria-hidden="true" />
+                  <span>Total game time</span>
+                  <strong>{formatGameDuration(gameResults.durationMs)}</strong>
+                </div>
               </div>
             </header>
             <div className="game-results-table" role="table" aria-label="Final victory point breakdown">

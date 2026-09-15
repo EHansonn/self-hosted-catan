@@ -2699,6 +2699,27 @@ input:focus {
   color: #6c715f;
   font-size: 13px;
 }
+.game-results-runtime {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 9px;
+  padding: 5px 9px;
+  border: 1px solid #d0b86e;
+  border-radius: 999px;
+  background: #fff8d5;
+  color: #78601f;
+  font-size: 12px;
+  line-height: 1;
+}
+.game-results-runtime svg {
+  width: 15px;
+  height: 15px;
+}
+.game-results-runtime strong {
+  color: #3c5260;
+  font-size: 13px;
+}
 .game-results-trophy {
   display: grid;
   width: 62px;

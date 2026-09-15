@@ -585,9 +585,12 @@ test("packaged server: guest joins, creator-only rooms, scaled tables, privacy, 
       false,
     );
     const remainingBeforePause = host.state!.game!.deadline! - Date.now();
+    const activeRuntimeBeforePause = host.state!.game!.pausedMs;
     assert.ok((await host.cmd({ type: "pause" })).ok);
     assert.equal(host.state!.paused, true);
     assert.equal(host.state!.game!.deadline, null);
+    assert.ok(host.state!.game!.pausedAt! <= Date.now());
+    assert.equal(host.state!.game!.pausedMs, activeRuntimeBeforePause);
     const paused = host.state!.game!.version;
     const privateId = clients[2].state!.me;
     clients[2].socket.close();
@@ -670,6 +673,8 @@ test("packaged server: guest joins, creator-only rooms, scaled tables, privacy, 
     assert.equal(restored.state!.game!.deadline, null);
     assert.ok((await restored.cmd({ type: "pause" })).ok);
     assert.equal(restored.state!.paused, false);
+    assert.equal(restored.state!.game!.pausedAt, null);
+    assert.ok(restored.state!.game!.pausedMs > activeRuntimeBeforePause);
     const resumedRemaining = restored.state!.game!.deadline! - Date.now();
     assert.ok(resumedRemaining <= storedRoom.pausedRemainingMs + 200);
     assert.ok(resumedRemaining > storedRoom.pausedRemainingMs - 1000);

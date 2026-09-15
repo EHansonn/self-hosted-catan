@@ -448,6 +448,16 @@ html[data-color-theme="dark"] .game-results-total {
   color: #dce6eb;
 }
 
+html[data-color-theme="dark"] .game-results-runtime {
+  border-color: #76652f;
+  background: #2e2a1d;
+  color: #d7c985;
+}
+
+html[data-color-theme="dark"] .game-results-runtime strong {
+  color: #f1e8bc;
+}
+
 html[data-color-theme="dark"] .game-results-labels {
   background: #1c313e;
   color: #9eb0bb;

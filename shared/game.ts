@@ -257,6 +257,10 @@ export interface Game {
   board: Board;
   players: Player[];
   options: Options;
+  startedAt: number;
+  finishedAt: number | null;
+  pausedAt: number | null;
+  pausedMs: number;
   bank: Hand;
   deck: Dev[];
   phase: Phase;
@@ -321,6 +325,7 @@ export interface GameResults {
   roomCode: string;
   winnerId: string;
   official: boolean;
+  durationMs: number;
   players: FinalPlayerResult[];
 }
 export interface Legal {
@@ -779,6 +784,10 @@ export function createGame(
       playedDev: false,
     })),
     options: gameOptions,
+    startedAt: Date.now(),
+    finishedAt: null,
+    pausedAt: null,
+    pausedMs: 0,
     bank: Object.fromEntries(
       RESOURCES.map((r) => [r, bankCardsPerResource(players.length)]),
     ) as Hand,
@@ -954,8 +963,18 @@ export function finalGameResults(
     roomCode,
     winnerId: g.winner || players[0]?.id || "",
     official,
+    durationMs: gameRuntimeMs(g),
     players,
   };
+}
+export function gameRuntimeMs(g: Game, now = Date.now()) {
+  const startedAt = Number.isFinite(g.startedAt) ? g.startedAt : now;
+  const finishedAt = Number.isFinite(g.finishedAt) ? g.finishedAt! : now;
+  const pausedMs = Number.isFinite(g.pausedMs) ? Math.max(0, g.pausedMs) : 0;
+  const currentPauseMs = Number.isFinite(g.pausedAt)
+    ? Math.max(0, finishedAt - Math.max(startedAt, g.pausedAt!))
+    : 0;
+  return Math.max(0, finishedAt - startedAt - pausedMs - currentPauseMs);
 }
 function spaced(g: Game, v: Vertex) {
   return (
@@ -1121,6 +1140,7 @@ function awards(g: Game) {
   if (!g.phase.startsWith("setup") && points(g, current) >= g.options.target) {
     g.winner = current.id;
     g.phase = "finished";
+    g.finishedAt = Date.now();
     g.offer = null;
     g.deadline = null;
     g.resumeTime = null;

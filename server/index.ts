@@ -182,6 +182,22 @@ if (existsSync(storePath)) {
       r.game?.players.forEach((p) => (p.connected = false));
       if (r.game) {
         r.game.options = { ...DEFAULT_OPTIONS, ...r.game.options };
+        r.game.startedAt = Number.isFinite(r.game.startedAt)
+          ? r.game.startedAt
+          : r.updated;
+        r.game.finishedAt = Number.isFinite(r.game.finishedAt)
+          ? r.game.finishedAt
+          : r.game.phase === "finished"
+            ? r.updated
+            : null;
+        r.game.pausedMs = Number.isFinite(r.game.pausedMs)
+          ? Math.max(0, r.game.pausedMs)
+          : 0;
+        r.game.pausedAt = Number.isFinite(r.game.pausedAt)
+          ? r.game.pausedAt
+          : r.paused
+            ? r.updated
+            : null;
         r.game.specialBuildRequests ??=
           r.game.options.paired && r.game.players.length > 4
             ? r.game.players
@@ -280,19 +296,24 @@ function save() {
 function setRoomPaused(room: Room, paused: boolean) {
   const game = room.game;
   if (!game || !!room.paused === paused) return;
+  const now = Date.now();
   if (paused) {
     room.pausedRemainingMs = game.deadline === null
       ? null
-      : Math.max(0, game.deadline - Date.now());
+      : Math.max(0, game.deadline - now);
     game.deadline = null;
+    game.pausedAt = now;
     room.paused = true;
     return;
   }
   const remaining = room.pausedRemainingMs;
+  if (game.pausedAt !== null)
+    game.pausedMs += Math.max(0, now - game.pausedAt);
+  game.pausedAt = null;
   room.paused = false;
   delete room.pausedRemainingMs;
   if (remaining === undefined) resetDeadline(game);
-  else game.deadline = remaining === null ? null : Date.now() + remaining;
+  else game.deadline = remaining === null ? null : now + remaining;
 }
 if (prunedCompletedRooms) save();
 const buckets = new Map<string, { count: number; until: number }>();
