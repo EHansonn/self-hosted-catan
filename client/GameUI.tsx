@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { RESOURCES, bankTradeUnits, total, type Action, type Dev, type GameView, type Hand, type Offer, type PublicPlayer, type Resource } from "../shared/game";
 import { spriteBackgroundPosition, type SpriteName } from "./sprites";
+import { tradeHandsForViewer } from "./tradePerspective";
 
 export type { SpriteName } from "./sprites";
 export const resourceNames = { wood: "Wood", brick: "Brick", sheep: "Sheep", wheat: "Wheat", ore: "Ore" };
@@ -210,6 +211,7 @@ export function TradeComposer({ open, onClose, game, me, hand, give, want, setGi
 export function OfferPanel({ offer, players, me, enabled, act, onEdit }: { offer: Offer; players: PublicPlayer[]; me: string; enabled: boolean; act: (a: Action) => Promise<boolean>; onEdit: () => void }) {
   const from = players.find(p => p.id === offer.from)!;
   const mine = offer.from === me, recipient = players.find(p => p.id === me)!;
+  const displayedHands = tradeHandsForViewer(offer, me);
   const canRespond = !mine && (!offer.to || offer.to === me);
   const canPay = RESOURCES.every(r => (recipient.resources?.[r] || 0) >= offer.want[r]);
   const missingCards = RESOURCES.flatMap(resource => {
@@ -232,8 +234,8 @@ export function OfferPanel({ offer, players, me, enabled, act, onEdit }: { offer
     </div>
     <div className="offer-owner-body cream-tray">
       <div className="offer-owner-lines">
-        <div className="trade-line receiving"><Sprite name="people" /><ArrowDown className="trade-arrow" /><CardRow hand={offer.give} label="Resources they receive" /></div>
-        <div className="trade-line giving"><Avatar player={from} /><ArrowUp className="trade-arrow" /><CardRow hand={offer.want} label="Resources you receive" /></div>
+        <div className="trade-line receiving"><Sprite name="people" /><ArrowDown className="trade-arrow" /><CardRow hand={displayedHands.receive} label="Resources you receive" /></div>
+        <div className="trade-line giving"><Avatar player={from} /><ArrowUp className="trade-arrow" /><CardRow hand={displayedHands.give} label="Resources you give" /></div>
       </div>
       <div className="offer-owner-side">
         <div className="offer-owner-response-rail" aria-label="Player responses">
@@ -272,8 +274,8 @@ export function OfferPanel({ offer, players, me, enabled, act, onEdit }: { offer
           : offer.rejected.includes(p.id) && <X className="offer-declined" aria-label={`${p.name} declined`} />}</span>;
     })}</div></div>
     <div className="offer-body cream-tray">
-      <div className="trade-line receiving"><Avatar player={from} /><ArrowDown className="trade-arrow" /><CardRow hand={offer.give} label="Offered resources" /></div>
-      <div className="trade-line giving"><Sprite name="people" /><ArrowUp className="trade-arrow" /><CardRow hand={offer.want} label="Requested resources" /></div>
+      <div className="trade-line receiving"><Avatar player={from} /><ArrowDown className="trade-arrow" /><CardRow hand={displayedHands.receive} label="Offered resources" /></div>
+      <div className="trade-line giving"><Sprite name="people" /><ArrowUp className="trade-arrow" /><CardRow hand={displayedHands.give} label="Requested resources" /></div>
       {broadcast && approvedByMe && <p className="offer-guidance">Approved — waiting for {from.name} to choose.</p>}
       {canRespond && !canPay && <p className="offer-guidance offer-unavailable">You cannot accept this trade. You are missing {missingCards.join(", ")}.</p>}
       <div className="offer-actions">
