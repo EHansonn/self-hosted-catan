@@ -36,7 +36,6 @@ services:
       backend:
       edge:
         aliases:
-          - caddy
           - catan-game
 
 volumes:
