@@ -14,5 +14,6 @@ COPY --from=build --chown=65532:65532 /app/dist/client ./dist/client
 COPY --from=build --chown=65532:65532 /app/dist/node/server.cjs ./dist/node/server.cjs
 USER 65532:65532
 EXPOSE 8080
-HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 CMD node -e "fetch('http://127.0.0.1:8080/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+  CMD ["/nodejs/bin/node", "-e", "fetch('http://127.0.0.1:8080/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
 CMD ["--max-old-space-size=160", "dist/node/server.cjs"]
