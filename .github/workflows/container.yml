@@ -78,11 +78,18 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Normalize the image name
+        id: image
+        shell: bash
+        run: |
+          image_name="ghcr.io/${GITHUB_REPOSITORY,,}"
+          echo "name=${image_name}" >> "${GITHUB_OUTPUT}"
+
       - name: Prepare image metadata
         id: metadata
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
         with:
-          images: ghcr.io/${{ github.repository }}
+          images: ${{ steps.image.outputs.name }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=semver,pattern={{version}}
@@ -106,7 +113,7 @@ jobs:
       - name: Scan the exact published image
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
-          image-ref: ghcr.io/${{ github.repository }}@${{ steps.publish.outputs.digest }}
+          image-ref: ${{ steps.image.outputs.name }}@${{ steps.publish.outputs.digest }}
           scanners: vuln,secret
           severity: HIGH,CRITICAL
           ignore-unfixed: false
