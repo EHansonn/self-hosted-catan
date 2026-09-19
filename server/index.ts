@@ -11,7 +11,13 @@ import {
   createReadStream,
 } from "node:fs";
 import { resolve, extname, sep } from "node:path";
-import { randomBytes, randomInt, createHash, timingSafeEqual } from "node:crypto";
+import {
+  randomBytes,
+  randomInt,
+  createHash,
+  scryptSync,
+  timingSafeEqual,
+} from "node:crypto";
 import { Server, type Socket } from "socket.io";
 import { z } from "zod";
 import {
@@ -111,8 +117,9 @@ if (!accessKey) {
 }
 if (accessKey.length < 12)
   throw new Error("ROOM_CREATE_PASSWORD must be at least 12 characters.");
-const hash = (s: string) => createHash("sha256").update(s).digest("hex");
-const accessHash = hash(accessKey);
+const fastHash = (s: string) => createHash("sha256").update(s).digest("hex");
+const accessSalt = `crossroads:${appName}:room-creation`;
+const accessHash = scryptSync(accessKey, accessSalt, 64);
 function positiveDuration(name: string, fallback: number, minimum: number) {
   const value = Number(process.env[name]);
   return Number.isFinite(value) && value >= minimum ? value : fallback;
@@ -213,7 +220,7 @@ if (existsSync(storePath)) {
       }
       r.options = { ...DEFAULT_OPTIONS, ...r.options };
       if (!Number.isInteger(r.mapSeed) || r.mapSeed < 0 || r.mapSeed > 0xffffffff)
-        r.mapSeed = Number.parseInt(hash(r.code).slice(0, 8), 16) >>> 0;
+        r.mapSeed = Number.parseInt(fastHash(r.code).slice(0, 8), 16) >>> 0;
       r.players.forEach((p) => (p.connected = false));
       r.game?.players.forEach((p) => (p.connected = false));
       if (r.game) {
@@ -424,7 +431,7 @@ function getSession(req: http.IncomingMessage) {
     .map((s) => s.trim())
     .find((s) => s.startsWith("harbor_session="))
     ?.slice(15);
-  const key = token ? hash(token) : "";
+  const key = token ? fastHash(token) : "";
   const session = sessions.get(key);
   return session && session.expires > Date.now() ? { session, key } : null;
 }
@@ -451,7 +458,7 @@ function issueSession(res: http.ServerResponse) {
     id: randomBytes(12).toString("hex"),
     expires: Date.now() + 7 * 86400000,
   };
-  const key = hash(token);
+  const key = fastHash(token);
   sessions.set(key, session);
   save();
   res.setHeader(
@@ -1202,8 +1209,8 @@ io.on("connection", (socket) => {
           const password = z.string().min(1).max(256).parse(command.password);
           if (
             !timingSafeEqual(
-              Buffer.from(hash(password)),
-              Buffer.from(accessHash),
+              scryptSync(password, accessSalt, 64),
+              accessHash,
             )
           )
             fail("That creator password is not correct.");
