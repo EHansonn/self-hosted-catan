@@ -2180,11 +2180,11 @@ export function App() {
                           className="code-field"
                           value={code}
                           onChange={(e) =>
-                            setCode(e.target.value.toUpperCase().slice(0, 6))
+                            setCode(e.target.value.toUpperCase().slice(0, 16))
                           }
                           required
-                          pattern="[A-Z0-9]{6}"
-                          placeholder="ABC123"
+                          pattern="[A-F0-9]{16}"
+                          placeholder="A1B2C3D4E5F60718"
                         />
                       </label>
                       <p className="fine-print watch-note">

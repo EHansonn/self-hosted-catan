@@ -41,6 +41,27 @@ const fresh = (n = 4, seed = 22, difficulty: Difficulty = "normal") =>
     seed,
   );
 
+test("server-provided randomness separates hidden outcomes from the public map seed", () => {
+  const players = Array.from({ length: 4 }, (_, index) =>
+    makePlayer(`p${index}`, `Player ${index}`, index),
+  );
+  const low = createGame(players, DEFAULT_OPTIONS, 90210, () => 0);
+  const high = createGame(players, DEFAULT_OPTIONS, 90210, () => 0.999999);
+  assert.deepEqual(low.board, high.board);
+  assert.notDeepEqual(low.deck, high.deck);
+
+  low.phase = "roll";
+  high.phase = "roll";
+  assert.deepEqual(applyAction(low, "p0", { type: "roll" }, () => 0).dice, [
+    1,
+    1,
+  ]);
+  assert.deepEqual(
+    applyAction(high, "p0", { type: "roll" }, () => 0.999999).dice,
+    [6, 6],
+  );
+});
+
 test("only lobbies and unfinished games can be resumed", () => {
   const game = fresh();
   assert.equal(canResumeRoom(null), true);

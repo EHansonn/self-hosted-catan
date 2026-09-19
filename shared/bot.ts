@@ -4,6 +4,7 @@ import {
   type Player,
   type Resource,
   type Hand,
+  type RandomSource,
   RESOURCES,
   COSTS,
   canPay,
@@ -107,9 +108,9 @@ function goalCosts(g: Game, p: Player) {
     goals.push({ kind: "development", cost: COSTS.development });
   return goals;
 }
-function randomItem<T>(g: Game, items: readonly T[]) {
+function randomItem<T>(g: Game, items: readonly T[], random?: RandomSource) {
   return items.length
-    ? items[Math.floor(rng(g) * items.length)]
+    ? items[Math.floor((random ? random() : rng(g)) * items.length)]
     : undefined;
 }
 function timeoutRobberSites(g: Game, p: Player) {
@@ -125,6 +126,7 @@ export function chooseTimeoutAction(
   g: Game,
   p: Player,
   discardSelection?: Hand,
+  random?: RandomSource,
 ): Action | null {
   if (g.phase === "finished") return null;
   if (g.phase === "discard" && g.discards[p.id]) {
@@ -146,7 +148,9 @@ export function chooseTimeoutAction(
       remaining[resource] -= cards[resource];
     });
     for (let n = total(cards); n < required; n++) {
-      let pick = Math.floor(rng(g) * total(remaining));
+      let pick = Math.floor(
+        (random ? random() : rng(g)) * total(remaining),
+      );
       const resource = RESOURCES.find((candidate) => {
         pick -= remaining[candidate];
         return pick < 0;
@@ -160,19 +164,19 @@ export function chooseTimeoutAction(
   if (g.players[g.current].id !== p.id) return null;
   if (g.phase === "roll") return { type: "roll" };
   if (g.phase === "setupSettlement") {
-    const id = randomItem(g, settlementSites(g, p, true));
+    const id = randomItem(g, settlementSites(g, p, true), random);
     return id === undefined ? null : { type: "settlement", id };
   }
   if (g.phase === "setupRoad") {
-    const id = randomItem(g, roadSites(g, p, true));
+    const id = randomItem(g, roadSites(g, p, true), random);
     return id === undefined ? null : { type: "road", id };
   }
   if (g.phase === "robber") {
-    const id = randomItem(g, timeoutRobberSites(g, p));
+    const id = randomItem(g, timeoutRobberSites(g, p), random);
     return id === undefined ? null : { type: "robber", id };
   }
   if (g.phase === "steal") {
-    const player = randomItem(g, g.victims);
+    const player = randomItem(g, g.victims, random);
     return player === undefined ? null : { type: "steal", player };
   }
   if (g.phase === "freeRoad") {

@@ -5,6 +5,7 @@ import {
   writeFileSync,
   mkdirSync,
   renameSync,
+  copyFileSync,
   existsSync,
   statSync,
   createReadStream,
@@ -116,9 +117,20 @@ function positiveDuration(name: string, fallback: number, minimum: number) {
   const value = Number(process.env[name]);
   return Number.isFinite(value) && value >= minimum ? value : fallback;
 }
+function positiveInteger(name: string, fallback: number, minimum: number) {
+  const value = Number(process.env[name]);
+  return Number.isInteger(value) && value >= minimum ? value : fallback;
+}
+const ROOM_CODE_PATTERN = /^[A-F0-9]{16}$/;
+const secureRandom = () => randomInt(0x100000000) / 0x100000000;
 const MAX_ROOMS = 8,
   MAX_SESSIONS = 100,
-  MAX_CONNECTIONS = 48,
+  MAX_CONNECTIONS = positiveInteger("MAX_CONNECTIONS", 96, 12),
+  MAX_CONNECTIONS_PER_IP = positiveInteger(
+    "MAX_CONNECTIONS_PER_IP",
+    16,
+    3,
+  ),
   ROOM_TTL = 7 * 86400000,
   EMPTY_GAME_GRACE_MS = positiveDuration(
     "EMPTY_GAME_GRACE_MS",
@@ -162,12 +174,28 @@ interface Room {
 }
 const sessions = new Map<string, Session>(),
   rooms = new Map<string, Room>(),
-  connections = new Map<string, Set<string>>();
+  connections = new Map<string, Set<string>>(),
+  connectionsByIp = new Map<string, number>();
 let community: CommunityState = emptyCommunity();
 const storePath = resolve(dataDir, "state.json");
+const backupStorePath = storePath + ".bak";
 let prunedCompletedRooms = false;
+const migratedRoomCodes = new Map<string, string>();
 if (existsSync(storePath)) {
-  const saved = JSON.parse(readFileSync(storePath, "utf8"));
+  let saved: {
+    schema: number;
+    sessions: [string, Session][];
+    rooms: Room[];
+    community?: unknown;
+  };
+  try {
+    saved = JSON.parse(readFileSync(storePath, "utf8"));
+  } catch (error) {
+    if (!existsSync(backupStorePath)) throw error;
+    console.error("Primary state could not be read; restoring the last backup.");
+    saved = JSON.parse(readFileSync(backupStorePath, "utf8"));
+    prunedCompletedRooms = true;
+  }
   if (![1, 2].includes(saved.schema))
     throw new Error("Unsupported save schema.");
   community = hydrateCommunity(saved.community);
@@ -175,6 +203,14 @@ if (existsSync(storePath)) {
     if (s.expires > Date.now()) sessions.set(key, s);
   for (const r of saved.rooms as Room[])
     if (Date.now() - r.updated < ROOM_TTL) {
+      if (!ROOM_CODE_PATTERN.test(r.code)) {
+        if (!/^[A-F0-9]{6}$/.test(r.code)) continue;
+        const previousCode = r.code;
+        do r.code = randomBytes(8).toString("hex").toUpperCase();
+        while (rooms.has(r.code));
+        migratedRoomCodes.set(previousCode, r.code);
+        prunedCompletedRooms = true;
+      }
       r.options = { ...DEFAULT_OPTIONS, ...r.options };
       if (!Number.isInteger(r.mapSeed) || r.mapSeed < 0 || r.mapSeed > 0xffffffff)
         r.mapSeed = Number.parseInt(hash(r.code).slice(0, 8), 16) >>> 0;
@@ -278,6 +314,16 @@ if (existsSync(storePath)) {
         continue;
       rooms.set(r.code, r);
     }
+  for (const session of sessions.values()) {
+    const migrated = session.room
+      ? migratedRoomCodes.get(session.room)
+      : undefined;
+    if (migrated) session.room = migrated;
+    if (session.room && !rooms.has(session.room)) {
+      delete session.room;
+      prunedCompletedRooms = true;
+    }
+  }
 }
 function save() {
   const tmp = storePath + ".tmp";
@@ -291,6 +337,7 @@ function save() {
     }),
     { mode: 0o600 },
   );
+  if (existsSync(storePath)) copyFileSync(storePath, backupStorePath);
   renameSync(tmp, storePath);
 }
 function setRoomPaused(room: Room, paused: boolean) {
@@ -356,6 +403,20 @@ function originAllowed(req: http.IncomingMessage) {
   } catch {
     return false;
   }
+}
+function httpsRedirectOrigin(req: http.IncomingMessage) {
+  if (
+    process.env.SECURE_COOKIE !== "true" ||
+    req.headers["x-forwarded-proto"] !== "http"
+  )
+    return null;
+  const host = req.headers.host?.toLowerCase();
+  return (
+    [...allowedOrigins].find((origin) => {
+      const candidate = new URL(origin);
+      return candidate.protocol === "https:" && candidate.host === host;
+    }) || null
+  );
 }
 function getSession(req: http.IncomingMessage) {
   const token = req.headers.cookie
@@ -423,6 +484,16 @@ const server = http.createServer(async (req, res) => {
   const ip = requestIp(req);
   const path = (req.url || "/").split("?")[0];
   try {
+    const redirectOrigin = httpsRedirectOrigin(req);
+    if (redirectOrigin) {
+      if (!["GET", "HEAD"].includes(req.method || ""))
+        return json(res, 426, { error: "Use HTTPS for this request." });
+      res.writeHead(308, {
+        Location: redirectOrigin + (req.url || "/"),
+        "Cache-Control": "no-store",
+      });
+      return res.end();
+    }
     if (!originAllowed(req))
       return json(res, 403, { error: "Origin is not allowed." });
     if (path === "/api/health")
@@ -552,8 +623,12 @@ io.use((socket, next) => {
     return next(new Error(`Open ${appName} again to start a player session.`));
   if ((connections.get(auth.session.id)?.size || 0) >= 3)
     return next(new Error("Close another game tab first."));
+  const ip = requestIp(socket.request);
+  if ((connectionsByIp.get(ip) || 0) >= MAX_CONNECTIONS_PER_IP)
+    return next(new Error("Too many game connections from this network."));
   socket.data.session = auth.session;
   socket.data.key = auth.key;
+  socket.data.clientIp = ip;
   next();
 });
 const optionsSchema = z.object({
@@ -1045,6 +1120,8 @@ io.on("connection", (socket) => {
   const set = connections.get(session.id) || new Set<string>();
   set.add(socket.id);
   connections.set(session.id, set);
+  const clientIp = String(socket.data.clientIp);
+  connectionsByIp.set(clientIp, (connectionsByIp.get(clientIp) || 0) + 1);
   socket.on("command", (raw: unknown, ack: (v: unknown) => void) => {
     if (typeof ack !== "function") return;
     try {
@@ -1079,7 +1156,9 @@ io.on("connection", (socket) => {
         return r;
       };
       if (command.type === "spectate") {
-        const code = z.string().regex(/^[A-Z0-9]{6}$/).parse(command.code);
+        if (!limit("room-lookup:" + clientIp, 60, 15 * 60000))
+          fail("Too many room lookups. Try again in 15 minutes.");
+        const code = z.string().regex(ROOM_CODE_PATTERN).parse(command.code);
         const r = rooms.get(code) || fail("Room not found. Check your code.");
         if (!r.game || r.game.phase === "finished")
           fail("That game is not currently in progress.");
@@ -1141,7 +1220,7 @@ io.on("connection", (socket) => {
           releaseFinishedRoom(session, savedRoom);
           let code = "";
           do {
-            code = randomBytes(4).toString("hex").slice(0, 6).toUpperCase();
+            code = randomBytes(8).toString("hex").toUpperCase();
           } while (rooms.has(code));
           r = {
             code,
@@ -1156,9 +1235,11 @@ io.on("connection", (socket) => {
           rooms.set(code, r);
         } else {
           name = playerName.parse(command.name);
+          if (!limit("room-lookup:" + clientIp, 60, 15 * 60000))
+            fail("Too many room lookups. Try again in 15 minutes.");
           const code = z
             .string()
-            .regex(/^[A-Z0-9]{6}$/)
+            .regex(ROOM_CODE_PATTERN)
             .parse(command.code);
           r = rooms.get(code) || fail("Room not found. Check your code.");
           if (r.game) {
@@ -1205,7 +1286,9 @@ io.on("connection", (socket) => {
         return ack({ ok: true });
       }
       if (command.type === "resume") {
-        const code = z.string().regex(/^[A-Z0-9]{6}$/).parse(command.code);
+        if (!limit("room-lookup:" + clientIp, 60, 15 * 60000))
+          fail("Too many room lookups. Try again in 15 minutes.");
+        const code = z.string().regex(ROOM_CODE_PATTERN).parse(command.code);
         const r =
           savedRoom &&
           canResumeRoom(savedRoom.game) &&
@@ -1417,6 +1500,7 @@ io.on("connection", (socket) => {
           r.players,
           r.options,
           r.mapSeed,
+          secureRandom,
         );
         r.matchId = randomBytes(12).toString("hex");
         r.recordedMatchId = undefined;
@@ -1509,7 +1593,7 @@ io.on("connection", (socket) => {
           r.game.offer?.id === action.offerId;
         if (version !== r.game.version && !respondingToCurrentOffer)
           return ack({ ok: false, reason: "stale", version: r.game.version });
-        r.game = applyAction(r.game, session.id, action);
+        r.game = applyAction(r.game, session.id, action, secureRandom);
         changed(r);
         return ack({ ok: true });
       }
@@ -1533,6 +1617,9 @@ io.on("connection", (socket) => {
     const set = connections.get(session.id);
     set?.delete(socket.id);
     if (!set?.size) connections.delete(session.id);
+    const remaining = (connectionsByIp.get(clientIp) || 1) - 1;
+    if (remaining > 0) connectionsByIp.set(clientIp, remaining);
+    else connectionsByIp.delete(clientIp);
     if (viewedRoom) attendanceChanged(viewedRoom);
   });
 });
@@ -1564,9 +1651,14 @@ const tick = setInterval(
               if (g.discards[p.id]) {
                 const a = p.bot || p.automated
                   ? chooseBotAction(g, p)
-                  : chooseTimeoutAction(g, p, room.discardSelections?.[p.id]);
+                  : chooseTimeoutAction(
+                      g,
+                      p,
+                      room.discardSelections?.[p.id],
+                      secureRandom,
+                    );
                 if (a) {
-                  room.game = applyAction(g, p.id, a);
+                  room.game = applyAction(g, p.id, a, secureRandom);
                   changed(room);
                   break;
                 }
@@ -1582,10 +1674,10 @@ const tick = setInterval(
             g.players[g.current].id === p.id;
           if (!p.bot && !p.automated && !auto) continue;
           const a = auto && !p.bot && !p.automated
-            ? chooseTimeoutAction(g, p)
+            ? chooseTimeoutAction(g, p, undefined, secureRandom)
             : chooseBotAction(g, p);
           if (a) {
-            room.game = applyAction(g, p.id, a);
+            room.game = applyAction(g, p.id, a, secureRandom);
             changed(room);
             break;
           }
@@ -1609,11 +1701,13 @@ const cleanup = setInterval(() => {
   const now = Date.now();
   const homeSessions = new Set<string>();
   const closedRooms = new Set<string>();
+  let stateChanged = false;
   for (const [code, room] of rooms) {
     const attendanceChanged = refreshRoomAttendance(room, now);
     const takeoverChanged = refreshDisconnectedTakeovers(room, now);
     if (attendanceChanged || takeoverChanged) {
       room.updated = now;
+      stateChanged = true;
       broadcast(room);
     }
     const shouldClose = unattendedGameExpired(
@@ -1631,11 +1725,15 @@ const cleanup = setInterval(() => {
     rooms.delete(code);
     autoTurns.delete(code);
     closedRooms.add(code);
+    stateChanged = true;
   }
   for (const [key, s] of sessions)
-    if (s.expires < now) sessions.delete(key);
+    if (s.expires < now) {
+      sessions.delete(key);
+      stateChanged = true;
+    }
   for (const [key, b] of buckets) if (b.until < now) buckets.delete(key);
-  save();
+  if (stateChanged) save();
   homeSessions.forEach(sendSessionHome);
   for (const socket of io.sockets.sockets.values())
     if (closedRooms.has(String(socket.data.room))) sendHome(socket);

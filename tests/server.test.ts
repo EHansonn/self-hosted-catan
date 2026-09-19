@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import http from "node:http";
 import { spawn, type ChildProcess } from "node:child_process";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -34,6 +35,7 @@ test("packaged server: guest joins, creator-only rooms, scaled tables, privacy, 
         APP_NAME: "Test Table",
         ROOM_CREATE_PASSWORD: key,
         SECURE_COOKIE: "true",
+        ALLOWED_ORIGINS: "https://catan.example",
         BOT_INTERVAL_MS: "50",
       },
       stdio: ["ignore", "pipe", "pipe"],
@@ -125,6 +127,33 @@ test("packaged server: guest joins, creator-only rooms, scaled tables, privacy, 
     await start();
     const health = await fetch(url + "/api/health");
     assert.deepEqual(await health.json(), { ok: true, name: "Test Table" });
+    const redirect = await new Promise<{
+      status: number | undefined;
+      location: string | undefined;
+    }>((resolve, reject) => {
+      const request = http.get(
+        url + "/join?code=private",
+        {
+          headers: {
+            Host: "catan.example",
+            "X-Forwarded-Proto": "http",
+          },
+        },
+        (response) => {
+          response.resume();
+          resolve({
+            status: response.statusCode,
+            location: response.headers.location,
+          });
+        },
+      );
+      request.on("error", reject);
+    });
+    assert.equal(redirect.status, 308);
+    assert.equal(
+      redirect.location,
+      "https://catan.example/join?code=private",
+    );
     const config = await fetch(url + "/api/config");
     assert.deepEqual(await config.json(), { appName: "Test Table" });
     const home = await fetch(url + "/");

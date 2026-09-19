@@ -366,6 +366,8 @@ export interface ResumeRoomView {
   updated: number;
 }
 
+export type RandomSource = () => number;
+
 export function rng(g: { rng: number }) {
   g.rng = (g.rng + 0x6d2b79f5) | 0;
   let t = g.rng;
@@ -373,10 +375,17 @@ export function rng(g: { rng: number }) {
   t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
   return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
 }
-export function shuffle<T>(items: T[], g: { rng: number }) {
+function randomValue(g: { rng: number }, random?: RandomSource) {
+  return random ? random() : rng(g);
+}
+export function shuffle<T>(
+  items: T[],
+  g: { rng: number },
+  random?: RandomSource,
+) {
   const a = [...items];
   for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(rng(g) * (i + 1));
+    const j = Math.floor(randomValue(g, random) * (i + 1));
     [a[i], a[j]] = [a[j], a[i]];
   }
   return a;
@@ -771,6 +780,7 @@ export function createGame(
   players: Player[],
   options: Options,
   seed: number,
+  random?: RandomSource,
 ): Game {
   const gameOptions = { ...DEFAULT_OPTIONS, ...options };
   const g: Game = {
@@ -820,7 +830,7 @@ export function createGame(
     resumeTime: null,
   };
   g.robber = g.board.tiles.find((t) => t.terrain === "desert")!.id;
-  g.deck = shuffle<Dev>(developmentDeck(players.length), g);
+  g.deck = shuffle<Dev>(developmentDeck(players.length), g, random);
   note(
     g,
     "The island is ready. Place two settlements and roads in reverse order.",
@@ -1268,12 +1278,17 @@ export function bankTradeUnits(give: Hand, rates: Hand) {
   }
   return units;
 }
-function stealCard(g: Game, thief: Player, victimId: string) {
+function stealCard(
+  g: Game,
+  thief: Player,
+  victimId: string,
+  random?: RandomSource,
+) {
   const victim = g.players.find((player) => player.id === victimId)!;
   const cards = RESOURCES.flatMap((resource) =>
     Array<Resource>(victim.resources[resource]).fill(resource),
   );
-  const resource = cards[Math.floor(rng(g) * cards.length)];
+  const resource = cards[Math.floor(randomValue(g, random) * cards.length)];
   victim.resources[resource]--;
   thief.resources[resource]++;
   const publicText = `${thief.name} steals a card from ${victim.name}.`;
@@ -1287,6 +1302,7 @@ export function applyAction(
   game: Game,
   playerId: string,
   action: Action,
+  random?: RandomSource,
 ): Game {
   const g = structuredClone(game);
   const earnsTurnTime =
@@ -1296,7 +1312,7 @@ export function applyAction(
     game.phase === "freeRoad"
       ? game.resumeTime !== null
       : game.deadline !== null;
-  mutate(g, playerId, action);
+  mutate(g, playerId, action, random);
   if (earnsTurnTime && hasTimedTurn) {
     const bonus =
       (g.options.turnActionBonus ?? DEFAULT_OPTIONS.turnActionBonus) * 1000;
@@ -1334,7 +1350,7 @@ export function toggleSpecialBuildRequest(game: Game, playerId: string): Game {
   g.version++;
   return g;
 }
-function mutate(g: Game, id: string, a: Action) {
+function mutate(g: Game, id: string, a: Action, random?: RandomSource) {
   ensure(g.phase !== "finished", "This game has ended.");
   const p = g.players.find((x) => x.id === id);
   ensure(p, "You are not seated in this game.");
@@ -1508,7 +1524,10 @@ function mutate(g: Game, id: string, a: Action) {
   }
   if (a.type === "roll") {
     ensure(g.phase === "roll", "You have already rolled.");
-    g.dice = [1 + Math.floor(rng(g) * 6), 1 + Math.floor(rng(g) * 6)];
+    g.dice = [
+      1 + Math.floor(randomValue(g, random) * 6),
+      1 + Math.floor(randomValue(g, random) * 6),
+    ];
     const roll = g.dice[0] + g.dice[1];
     note(g, `${p.name} rolls ${roll}.`, "roll");
     if (roll === 7) {
@@ -1545,7 +1564,7 @@ function mutate(g: Game, id: string, a: Action) {
     );
     note(g, `${p.name} moves the robber.`);
     if (g.victims.length === 1) {
-      stealCard(g, p, g.victims[0]);
+      stealCard(g, p, g.victims[0], random);
       g.victims = [];
       g.phase = g.resumePhase;
       restoreDeadline(g);
@@ -1561,7 +1580,7 @@ function mutate(g: Game, id: string, a: Action) {
       g.phase === "steal" && g.victims.includes(a.player),
       "Choose an adjacent player with cards.",
     );
-    stealCard(g, p, a.player);
+    stealCard(g, p, a.player, random);
     g.phase = g.resumePhase;
     g.victims = [];
     restoreDeadline(g);
