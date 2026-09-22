@@ -229,6 +229,7 @@ function CardPicker({
 const actionClockLabels: Partial<Record<Phase, string>> = {
   setupSettlement: "place a settlement",
   setupRoad: "place a road",
+  roll: "roll the dice",
   discard: "discard cards",
   robber: "move the robber",
   steal: "choose a player",
@@ -1554,6 +1555,16 @@ export function App() {
           </div>
           <button
             type="button"
+            className={`setup-choice horizontal ${room.options.autoRollDice ? "selected" : ""}`}
+            aria-pressed={room.options.autoRollDice}
+            disabled={!host || pending}
+            onClick={() => updateRoomOptions({ autoRollDice: !room.options.autoRollDice })}
+          >
+            <Dices size={27} />
+            <span><strong>Auto-roll dice</strong><small>Roll automatically at the start of each turn</small></span>
+          </button>
+          <button
+            type="button"
             className={`setup-choice horizontal ${room.options.friendlyRobber ? "selected" : ""}`}
             aria-pressed={room.options.friendlyRobber}
             disabled={!host || pending}
@@ -2017,6 +2028,8 @@ export function App() {
                 )}
                 <Dice
                   values={game.dice}
+                  onRoll={myTurn && game.phase === "roll" && !game.options.autoRollDice ? () => act({ type: "roll" }) : undefined}
+                  disabled={pending || room.paused || !connected}
                 />
               </div>
               {!spectator && game.offer && modal !== "trade" && !game.offer.rejected.includes(room.me) && <OfferPanel offer={game.offer} players={room.players} me={room.me} enabled={connected && !pending && !room.paused} act={act} onEdit={editOffer} />}
@@ -2045,6 +2058,15 @@ export function App() {
                   <div>
                     <strong>{phaseText}</strong>
                   </div>
+                  {myTurn && game.phase === "roll" && !game.options.autoRollDice && (
+                    <button
+                      className="btn primary roll-btn"
+                      disabled={pending || room?.paused || !connected}
+                      onClick={() => act({ type: "roll" })}
+                    >
+                      <Dices size={18} /> Roll dice
+                    </button>
+                  )}
                   {game.phase === "freeRoad" && myTurn && (
                     <button
                       className="btn subtle"
@@ -2787,6 +2809,7 @@ export function App() {
                   ? `${room.options.discardTimer ?? DEFAULT_OPTIONS.discardTimer}s discards`
                   : "Untimed discards"}
                 {room.options.showDiscardedCards ? " · visible discards" : " · anonymous discards"}
+                {room.options.autoRollDice ? " · auto-roll dice" : " · manual dice rolls"}
                 {room.options.linkedTwoTwelve ? " · 2 and 12 linked" : ""}
               </>
             ) : (

@@ -133,6 +133,7 @@ export interface Options extends MapGenerationRules {
   actionTimer: number;
   discardTimer: number;
   balanced: boolean;
+  autoRollDice: boolean;
   friendlyRobber: boolean;
   linkedTwoTwelve: boolean;
   paired: boolean;
@@ -152,6 +153,7 @@ export const DEFAULT_OPTIONS: Options = {
   actionTimer: 10,
   discardTimer: 20,
   balanced: true,
+  autoRollDice: false,
   ...DEFAULT_MAP_GENERATION_RULES,
   friendlyRobber: false,
   linkedTwoTwelve: false,
@@ -864,7 +866,7 @@ export function note(
 }
 export function phaseTimerSeconds(options: Options, phase: Phase) {
   if (phase === "finished") return 0;
-  if (phase === "roll") return 0;
+  if (phase === "roll" && options.autoRollDice) return 0;
   if (phase === "main") return options.timer;
   if (phase === "setupSettlement")
     return options.setupSettlementTimer ?? DEFAULT_OPTIONS.setupSettlementTimer;

@@ -747,6 +747,7 @@ const optionsSchema = z.object({
     z.literal(60),
   ]).default(20),
   balanced: z.boolean(),
+  autoRollDice: z.boolean().default(false),
   allowSixEightTouch: z.boolean().default(false),
   allowTwoTwelveTouch: z.boolean().default(true),
   allowSameNumbersTouch: z.boolean().default(true),
@@ -1128,7 +1129,7 @@ function closeCompletedRoom(room: Room) {
 }
 function autoRollDice(room: Room) {
   const game = room.game;
-  if (!game || room.paused || game.phase !== "roll") return;
+  if (!game || room.paused || !game.options.autoRollDice || game.phase !== "roll") return;
   const player = game.players[game.current];
   room.game = applyAction(game, player.id, { type: "roll" }, secureRandom);
 }
@@ -1674,7 +1675,7 @@ const tick = setInterval(
       )
         continue;
       try {
-        if (g.phase === "roll") {
+        if (g.phase === "roll" && g.options.autoRollDice) {
           autoRollDice(room);
           changed(room);
           continue;

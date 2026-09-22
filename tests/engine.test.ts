@@ -809,7 +809,8 @@ test("required actions, discards and main turns use their own clocks", () => {
   turn = applyAction(turn, "p0", { type: "roll" });
   assert.equal(turn.phase, "main");
   assert.ok(turn.deadline! > Date.now() + 58000);
-  assert.equal(phaseTimerSeconds(turn.options, "roll"), 0);
+  assert.equal(phaseTimerSeconds(turn.options, "roll"), 10);
+  assert.equal(phaseTimerSeconds({ ...turn.options, autoRollDice: true }, "roll"), 0);
   assert.equal(phaseTimerSeconds(turn.options, "setupSettlement"), 120);
   assert.equal(phaseTimerSeconds(turn.options, "setupRoad"), 20);
   assert.equal(phaseTimerSeconds(turn.options, "robber"), 20);
