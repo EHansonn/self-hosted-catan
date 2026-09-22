@@ -81,6 +81,10 @@ import {
 import { hasRemainingTurnAction } from "./turnActions";
 import { orderPlayersForViewer } from "./playerOrder";
 import {
+  LEGACY_ROOM_CODE_LENGTH,
+  ROOM_CODE_INPUT_PATTERN,
+} from "../shared/room-code";
+import {
   type RoomView,
   type ResumeRoomView,
   type GameResults,
@@ -2187,12 +2191,14 @@ export function App() {
                           aria-label="Room code"
                           className="code-field"
                           value={code}
+                          maxLength={LEGACY_ROOM_CODE_LENGTH}
                           onChange={(e) =>
-                            setCode(e.target.value.toUpperCase().slice(0, 16))
+                            setCode(e.target.value.toUpperCase().slice(0, LEGACY_ROOM_CODE_LENGTH))
                           }
                           required
-                          pattern="[A-F0-9]{16}"
-                          placeholder="A1B2C3D4E5F60718"
+                          pattern={ROOM_CODE_INPUT_PATTERN}
+                          placeholder="A1B2C3"
+                          title="Enter a 6-character room code, or an existing 16-character code"
                         />
                       </label>
                       <p className="fine-print watch-note">

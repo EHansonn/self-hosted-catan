@@ -22,6 +22,7 @@ game data and other private values from screenshots and logs.
 
 The application is intended for a trusted group rather than hostile public
 matchmaking. Anyone with a room code can enter its lobby or spectate an active
-game. Use HTTPS for access over untrusted networks, keep the room-creation
+game. Six-character room codes are invitations, not passwords; avoid sharing
+them publicly. Use HTTPS for access over untrusted networks, keep the room-creation
 password private, and do not expose the application container directly when
 proxy-header trust is enabled.
