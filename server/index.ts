@@ -66,6 +66,10 @@ import {
   nextUnattendedSince,
   unattendedGameExpired,
 } from "../shared/room-lifecycle";
+import {
+  NEW_ROOM_CODE_LENGTH,
+  ROOM_CODE_PATTERN,
+} from "../shared/room-code";
 
 const port = Number(process.env.PORT || 3001),
   host = process.env.HOST || "127.0.0.1";
@@ -138,7 +142,11 @@ function positiveInteger(name: string, fallback: number, minimum: number) {
   const value = Number(process.env[name]);
   return Number.isInteger(value) && value >= minimum ? value : fallback;
 }
-const ROOM_CODE_PATTERN = /^[A-F0-9]{16}$/;
+const newRoomCode = () =>
+  randomInt(36 ** NEW_ROOM_CODE_LENGTH)
+    .toString(36)
+    .toUpperCase()
+    .padStart(NEW_ROOM_CODE_LENGTH, "0");
 const secureRandom = () => randomInt(0x100000000) / 0x100000000;
 const MAX_ROOMS = 8,
   MAX_SESSIONS = 100,
@@ -197,7 +205,6 @@ let community: CommunityState = emptyCommunity();
 const storePath = resolve(dataDir, "state.json");
 const backupStorePath = storePath + ".bak";
 let prunedCompletedRooms = false;
-const migratedRoomCodes = new Map<string, string>();
 if (existsSync(storePath)) {
   let saved: {
     schema: number;
@@ -220,14 +227,7 @@ if (existsSync(storePath)) {
     if (s.expires > Date.now()) sessions.set(key, s);
   for (const r of saved.rooms as Room[])
     if (Date.now() - r.updated < ROOM_TTL) {
-      if (!ROOM_CODE_PATTERN.test(r.code)) {
-        if (!/^[A-F0-9]{6}$/.test(r.code)) continue;
-        const previousCode = r.code;
-        do r.code = randomBytes(8).toString("hex").toUpperCase();
-        while (rooms.has(r.code));
-        migratedRoomCodes.set(previousCode, r.code);
-        prunedCompletedRooms = true;
-      }
+      if (!ROOM_CODE_PATTERN.test(r.code)) continue;
       r.options = { ...DEFAULT_OPTIONS, ...r.options };
       if (!Number.isInteger(r.mapSeed) || r.mapSeed < 0 || r.mapSeed > 0xffffffff)
         r.mapSeed = Number.parseInt(fastHash(r.code).slice(0, 8), 16) >>> 0;
@@ -332,10 +332,6 @@ if (existsSync(storePath)) {
       rooms.set(r.code, r);
     }
   for (const session of sessions.values()) {
-    const migrated = session.room
-      ? migratedRoomCodes.get(session.room)
-      : undefined;
-    if (migrated) session.room = migrated;
     if (session.room && !rooms.has(session.room)) {
       delete session.room;
       prunedCompletedRooms = true;
@@ -1247,7 +1243,7 @@ io.on("connection", (socket) => {
           releaseFinishedRoom(session, savedRoom);
           let code = "";
           do {
-            code = randomBytes(8).toString("hex").toUpperCase();
+            code = newRoomCode();
           } while (rooms.has(code));
           r = {
             code,

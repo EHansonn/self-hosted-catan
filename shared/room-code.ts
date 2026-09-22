@@ -1,0 +1,4 @@
+export const NEW_ROOM_CODE_LENGTH = 6;
+export const LEGACY_ROOM_CODE_LENGTH = 16;
+export const ROOM_CODE_INPUT_PATTERN = `(?:[A-Z0-9]{${NEW_ROOM_CODE_LENGTH}}|[A-F0-9]{${LEGACY_ROOM_CODE_LENGTH}})`;
+export const ROOM_CODE_PATTERN = new RegExp(`^${ROOM_CODE_INPUT_PATTERN}$`);

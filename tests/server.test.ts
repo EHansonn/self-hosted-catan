@@ -288,6 +288,7 @@ test("packaged server: guest joins, creator-only rooms, scaled tables, privacy, 
     for (let i = 1; i < 12; i++)
       assert.ok((await host.cmd({ type: "bot" })).ok);
     const largeRoomCode = host.state!.code;
+    assert.match(largeRoomCode, /^[A-Z0-9]{6}$/);
     assert.equal(host.state!.players.length, 12);
     assert.equal(new Set(host.state!.players.map((player) => player.color)).size, 12);
     const largeRoomBotNames = host.state!.players
@@ -319,6 +320,7 @@ test("packaged server: guest joins, creator-only rooms, scaled tables, privacy, 
     );
     assert.equal(host.state!.players[0].color, COLORS[5]);
     const code = host.state!.code;
+    assert.match(code, /^[A-Z0-9]{6}$/);
     const duplicateName = await clients[1].cmd({
       type: "join",
       name: " hOsT ",
@@ -702,13 +704,22 @@ test("packaged server: guest joins, creator-only rooms, scaled tables, privacy, 
     await stop();
     storedRoom.game = storedGame;
     storedRoom.updated = Date.now();
+    const legacyCode = "0123456789ABCDEF";
+    storedRoom.code = legacyCode;
+    for (const [, savedSession] of snapshot.sessions as [string, { room?: string }][]) {
+      if (savedSession.room === code) savedSession.room = legacyCode;
+    }
     writeFileSync(join(dir, "state.json"), JSON.stringify(snapshot));
     await start();
     const restored = await connect(cookies[0]);
     assert.equal(restored.state, null);
-    assert.equal(restored.resumable[0].code, code);
-    assert.ok((await restored.cmd({ type: "resume", code })).ok);
-    assert.equal(restored.state!.code, code);
+    assert.equal(restored.resumable[0].code, legacyCode);
+    assert.ok((await restored.cmd({ type: "resume", code: legacyCode })).ok);
+    assert.equal(restored.state!.code, legacyCode);
+    const legacySpectator = await connect(await createSession());
+    assert.ok((await legacySpectator.cmd({ type: "spectate", code: legacyCode })).ok);
+    assert.equal(legacySpectator.state!.spectator, true);
+    legacySpectator.socket.close();
     assert.equal(restored.state!.mapSeed, selectedMapSeed);
     assert.equal(restored.state!.game!.version, before.version);
     assert.deepEqual(restored.state!.game!.board, before.board);
