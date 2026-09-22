@@ -864,6 +864,7 @@ export function note(
 }
 export function phaseTimerSeconds(options: Options, phase: Phase) {
   if (phase === "finished") return 0;
+  if (phase === "roll") return 0;
   if (phase === "main") return options.timer;
   if (phase === "setupSettlement")
     return options.setupSettlementTimer ?? DEFAULT_OPTIONS.setupSettlementTimer;

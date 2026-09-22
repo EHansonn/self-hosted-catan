@@ -531,7 +531,24 @@ test("packaged server: guest joins, creator-only rooms, scaled tables, privacy, 
       assert.ok(r.ok, r.error);
       await host.cmd({ type: "sync" });
     }
-    assert.equal(host.state!.game!.phase, "roll");
+    assert.notEqual(host.state!.game!.phase, "roll");
+    assert.equal(host.state!.game!.dice.length, 2);
+    while (["robber", "steal"].includes(host.state!.game!.phase)) {
+      const g = host.state!.game!;
+      const currentId = g.players[g.current].id;
+      const current = clients.find((client) => client.state?.me === currentId)!;
+      await current.cmd({ type: "sync" });
+      const action: Action = current.state!.game!.phase === "robber"
+        ? { type: "robber", id: current.state!.game!.legal.robber[0] }
+        : { type: "steal", player: current.state!.game!.victims[0] };
+      assert.ok((await current.cmd({
+        type: "action",
+        version: current.state!.game!.version,
+        action,
+      })).ok);
+      await host.cmd({ type: "sync" });
+    }
+    assert.equal(host.state!.game!.phase, "main");
     for (let i = 0; i < 6; i++) {
       await clients[i].cmd({ type: "sync" });
       const s = clients[i].state!;
@@ -555,25 +572,6 @@ test("packaged server: guest joins, creator-only rooms, scaled tables, privacy, 
       rollingId = rollingGame.players[rollingGame.current].id,
       rollingClient = clients.find((client) => client.state?.me === rollingId)!,
       waitingClient = clients.find((client) => client.state?.me !== rollingId)!;
-    assert.equal(
-      (
-        await waitingClient.cmd({
-          type: "action",
-          version,
-          action: { type: "roll" },
-        })
-      ).ok,
-      false,
-    );
-    assert.ok(
-      (
-        await rollingClient.cmd({
-          type: "action",
-          version,
-          action: { type: "roll" },
-        })
-      ).ok,
-    );
     await waitingClient.cmd({ type: "sync" });
     assert.ok(
       (

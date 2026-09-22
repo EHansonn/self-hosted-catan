@@ -229,7 +229,6 @@ function CardPicker({
 const actionClockLabels: Partial<Record<Phase, string>> = {
   setupSettlement: "place a settlement",
   setupRoad: "place a road",
-  roll: "roll the dice",
   discard: "discard cards",
   robber: "move the robber",
   steal: "choose a player",
@@ -2018,8 +2017,6 @@ export function App() {
                 )}
                 <Dice
                   values={game.dice}
-                  onRoll={myTurn && game.phase === "roll" ? () => act({ type: "roll" }) : undefined}
-                  disabled={pending || room.paused || !connected}
                 />
               </div>
               {!spectator && game.offer && modal !== "trade" && !game.offer.rejected.includes(room.me) && <OfferPanel offer={game.offer} players={room.players} me={room.me} enabled={connected && !pending && !room.paused} act={act} onEdit={editOffer} />}
@@ -2048,15 +2045,6 @@ export function App() {
                   <div>
                     <strong>{phaseText}</strong>
                   </div>
-                  {myTurn && game.phase === "roll" && (
-                    <button
-                      className="btn primary roll-btn"
-                      disabled={pending || room?.paused || !connected}
-                      onClick={() => act({ type: "roll" })}
-                    >
-                      <Dices size={18} /> Roll dice
-                    </button>
-                  )}
                   {game.phase === "freeRoad" && myTurn && (
                     <button
                       className="btn subtle"
