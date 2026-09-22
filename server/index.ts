@@ -743,6 +743,7 @@ const optionsSchema = z.object({
     z.literal(60),
   ]).default(20),
   balanced: z.boolean(),
+  autoRollDice: z.boolean().default(false),
   allowSixEightTouch: z.boolean().default(false),
   allowTwoTwelveTouch: z.boolean().default(true),
   allowSameNumbersTouch: z.boolean().default(true),
@@ -1122,7 +1123,14 @@ function closeCompletedRoom(room: Room) {
   if (communityChanged) broadcastCommunity();
   return true;
 }
+function autoRollDice(room: Room) {
+  const game = room.game;
+  if (!game || room.paused || !game.options.autoRollDice || game.phase !== "roll") return;
+  const player = game.players[game.current];
+  room.game = applyAction(game, player.id, { type: "roll" }, secureRandom);
+}
 function changed(room: Room) {
+  autoRollDice(room);
   if (room.discardSelections) {
     const activeDiscards =
       room.game?.phase === "discard" ? room.game.discards : {};
@@ -1663,6 +1671,11 @@ const tick = setInterval(
       )
         continue;
       try {
+        if (g.phase === "roll" && g.options.autoRollDice) {
+          autoRollDice(room);
+          changed(room);
+          continue;
+        }
         if (g.deadline && Date.now() > g.deadline) {
           if (g.phase === "main" && g.offer) {
             room.game = expirePlayerTrade(g);

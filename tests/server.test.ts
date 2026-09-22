@@ -263,6 +263,7 @@ test("packaged server: guest joins, creator-only rooms, scaled tables, privacy, 
       ).ok,
     );
     assert.deepEqual(clients[1].state!.options, DEFAULT_OPTIONS);
+    assert.equal(clients[1].state!.options.autoRollDice, false);
     assert.ok((await clients[1].cmd({ type: "close" })).ok);
     assert.equal(
       (
@@ -319,6 +320,11 @@ test("packaged server: guest joins, creator-only rooms, scaled tables, privacy, 
       ).ok,
     );
     assert.equal(host.state!.players[0].color, COLORS[5]);
+    assert.ok((await host.cmd({
+      type: "options",
+      options: { ...host.state!.options, autoRollDice: true },
+    })).ok);
+    assert.equal(host.state!.options.autoRollDice, true);
     const code = host.state!.code;
     assert.match(code, /^[A-Z0-9]{6}$/);
     const duplicateName = await clients[1].cmd({
@@ -533,7 +539,24 @@ test("packaged server: guest joins, creator-only rooms, scaled tables, privacy, 
       assert.ok(r.ok, r.error);
       await host.cmd({ type: "sync" });
     }
-    assert.equal(host.state!.game!.phase, "roll");
+    assert.notEqual(host.state!.game!.phase, "roll");
+    assert.equal(host.state!.game!.dice.length, 2);
+    while (["robber", "steal"].includes(host.state!.game!.phase)) {
+      const g = host.state!.game!;
+      const currentId = g.players[g.current].id;
+      const current = clients.find((client) => client.state?.me === currentId)!;
+      await current.cmd({ type: "sync" });
+      const action: Action = current.state!.game!.phase === "robber"
+        ? { type: "robber", id: current.state!.game!.legal.robber[0] }
+        : { type: "steal", player: current.state!.game!.victims[0] };
+      assert.ok((await current.cmd({
+        type: "action",
+        version: current.state!.game!.version,
+        action,
+      })).ok);
+      await host.cmd({ type: "sync" });
+    }
+    assert.equal(host.state!.game!.phase, "main");
     for (let i = 0; i < 6; i++) {
       await clients[i].cmd({ type: "sync" });
       const s = clients[i].state!;
@@ -557,25 +580,6 @@ test("packaged server: guest joins, creator-only rooms, scaled tables, privacy, 
       rollingId = rollingGame.players[rollingGame.current].id,
       rollingClient = clients.find((client) => client.state?.me === rollingId)!,
       waitingClient = clients.find((client) => client.state?.me !== rollingId)!;
-    assert.equal(
-      (
-        await waitingClient.cmd({
-          type: "action",
-          version,
-          action: { type: "roll" },
-        })
-      ).ok,
-      false,
-    );
-    assert.ok(
-      (
-        await rollingClient.cmd({
-          type: "action",
-          version,
-          action: { type: "roll" },
-        })
-      ).ok,
-    );
     await waitingClient.cmd({ type: "sync" });
     assert.ok(
       (
@@ -766,6 +770,54 @@ test("packaged server: guest joins, creator-only rooms, scaled tables, privacy, 
     assert.ok(setupRoadResumed <= setupRoadRemaining + 200);
     assert.ok(setupRoadResumed > setupRoadRemaining - 1000);
     console.log('The short action timer advanced one expired placement and opened a fresh action window.');
+    assert.ok((await restored.cmd({ type: "close" })).ok);
+    assert.ok((await restored.cmd({
+      type: "create",
+      name: "Manual dice host",
+      password: key,
+      options: { ...DEFAULT_OPTIONS, seats: 2 },
+    })).ok);
+    const manualGuest = await connect(await createSession());
+    assert.ok((await manualGuest.cmd({
+      type: "join",
+      code: restored.state!.code,
+      name: "Manual dice guest",
+    })).ok);
+    assert.ok((await restored.cmd({ type: "start" })).ok);
+    for (let step = 0; step < 8; step++) {
+      await restored.cmd({ type: "sync" });
+      const game = restored.state!.game!;
+      assert.ok(game.phase.startsWith("setup"));
+      const current = game.players[game.current].id === restored.state!.me
+        ? restored
+        : manualGuest;
+      await current.cmd({ type: "sync" });
+      const active = current.state!.game!;
+      const action: Action = active.phase === "setupSettlement"
+        ? { type: "settlement", id: active.legal.settlements[0] }
+        : { type: "road", id: active.legal.roads[0] };
+      assert.ok((await current.cmd({
+        type: "action",
+        version: active.version,
+        action,
+      })).ok);
+    }
+    await restored.cmd({ type: "sync" });
+    assert.equal(restored.state!.game!.phase, "roll");
+    assert.equal(restored.state!.game!.dice.length, 0);
+    await delay(150);
+    await restored.cmd({ type: "sync" });
+    assert.equal(restored.state!.game!.phase, "roll");
+    const manualRoller = restored.state!.game!.players[restored.state!.game!.current].id === restored.state!.me
+      ? restored
+      : manualGuest;
+    await manualRoller.cmd({ type: "sync" });
+    assert.ok((await manualRoller.cmd({
+      type: "action",
+      version: manualRoller.state!.game!.version,
+      action: { type: "roll" },
+    })).ok);
+    assert.notEqual(manualRoller.state!.game!.phase, "roll");
     for (let i = 0; i < 150; i++) await restored.cmd({ type: "sync" });
     assert.equal((await restored.cmd({ type: "sync" })).ok, false);
   } finally {

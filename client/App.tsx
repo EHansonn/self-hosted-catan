@@ -1559,6 +1559,16 @@ export function App() {
           </div>
           <button
             type="button"
+            className={`setup-choice horizontal ${room.options.autoRollDice ? "selected" : ""}`}
+            aria-pressed={room.options.autoRollDice}
+            disabled={!host || pending}
+            onClick={() => updateRoomOptions({ autoRollDice: !room.options.autoRollDice })}
+          >
+            <Dices size={27} />
+            <span><strong>Auto-roll dice</strong><small>Roll automatically at the start of each turn</small></span>
+          </button>
+          <button
+            type="button"
             className={`setup-choice horizontal ${room.options.friendlyRobber ? "selected" : ""}`}
             aria-pressed={room.options.friendlyRobber}
             disabled={!host || pending}
@@ -2022,7 +2032,7 @@ export function App() {
                 )}
                 <Dice
                   values={game.dice}
-                  onRoll={myTurn && game.phase === "roll" ? () => act({ type: "roll" }) : undefined}
+                  onRoll={myTurn && game.phase === "roll" && !game.options.autoRollDice ? () => act({ type: "roll" }) : undefined}
                   disabled={pending || room.paused || !connected}
                 />
               </div>
@@ -2052,7 +2062,7 @@ export function App() {
                   <div>
                     <strong>{phaseText}</strong>
                   </div>
-                  {myTurn && game.phase === "roll" && (
+                  {myTurn && game.phase === "roll" && !game.options.autoRollDice && (
                     <button
                       className="btn primary roll-btn"
                       disabled={pending || room?.paused || !connected}
@@ -2805,6 +2815,7 @@ export function App() {
                   ? `${room.options.discardTimer ?? DEFAULT_OPTIONS.discardTimer}s discards`
                   : "Untimed discards"}
                 {room.options.showDiscardedCards ? " · visible discards" : " · anonymous discards"}
+                {room.options.autoRollDice ? " · auto-roll dice" : " · manual dice rolls"}
                 {room.options.linkedTwoTwelve ? " · 2 and 12 linked" : ""}
               </>
             ) : (
