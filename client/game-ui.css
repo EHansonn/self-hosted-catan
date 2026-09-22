@@ -100,7 +100,7 @@ button.game-card:disabled { opacity: .42; }
 .hand-development-cards:focus-visible { outline: 3px solid #ffd05d; outline-offset: 3px; border-radius: 4px; }
 .hand-development-cards { flex: 0 0 auto; width: auto; gap: 9px; margin-left: auto; }
 .achievement { display: flex; flex-direction: column; align-items: center; color: #444; }.achievement .game-sprite { height: 31px; width: 35px; opacity: .52; }.achievement b { font-size: 18px; line-height: 21px; font-weight: 400; }.achievement.earned .game-sprite { opacity: 1; }.achievement.earned b { color: #604609; font-weight: 700; }.player-presence { position: absolute; right: 8px; top: 7px; font-size: 12px; }
-.in-game .activity-tabs { min-height: 36px; }.in-game .activity-tabs button { font-size: 14px; }.in-game .game-sidebar .activity { min-height: 90px; background: var(--cream); border: 0; }
+.in-game .activity-tabs { min-height: 36px; }.in-game .activity-tabs button { font-size: 14px; }.in-game .game-sidebar .activity { min-height: 240px; background: var(--cream); border: 0; }
 .in-game .game-sidebar .game-log-list { padding: 1px 13px 11px; }
 .log-turn-group { padding: 8px 0 9px; border-bottom: 1px solid #aeb6b9; }
 .log-turn-group:first-child { padding-top: 6px; }
