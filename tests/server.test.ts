@@ -32,7 +32,7 @@ test("packaged server: guest joins, creator-only rooms, scaled tables, privacy, 
         PORT: "18341",
         HOST: "127.0.0.1",
         DATA_DIR: dir,
-        APP_NAME: "Test Table",
+        APP_NAME: 'Catan & "Friends" <Game>',
         ROOM_CREATE_PASSWORD: key,
         SECURE_COOKIE: "true",
         ALLOWED_ORIGINS: "https://catan.example",
@@ -126,7 +126,10 @@ test("packaged server: guest joins, creator-only rooms, scaled tables, privacy, 
   try {
     await start();
     const health = await fetch(url + "/api/health");
-    assert.deepEqual(await health.json(), { ok: true, name: "Test Table" });
+    assert.deepEqual(await health.json(), {
+      ok: true,
+      name: 'Catan & "Friends" <Game>',
+    });
     const redirect = await new Promise<{
       status: number | undefined;
       location: string | undefined;
@@ -155,7 +158,9 @@ test("packaged server: guest joins, creator-only rooms, scaled tables, privacy, 
       "https://catan.example/join?code=private",
     );
     const config = await fetch(url + "/api/config");
-    assert.deepEqual(await config.json(), { appName: "Test Table" });
+    assert.deepEqual(await config.json(), {
+      appName: 'Catan & "Friends" <Game>',
+    });
     const home = await fetch(url + "/");
     assert.equal(home.status, 200);
     const headers = home.headers;
@@ -176,7 +181,16 @@ test("packaged server: guest joins, creator-only rooms, scaled tables, privacy, 
       headers.get("strict-transport-security"),
       "max-age=31536000",
     );
-    assert.match(await home.text(), /name="robots" content="noindex/);
+    const homeHtml = await home.text();
+    assert.match(homeHtml, /name="robots" content="noindex/);
+    assert.match(
+      homeHtml,
+      /<title>Catan &amp; &quot;Friends&quot; &lt;Game&gt;<\/title>/,
+    );
+    assert.match(
+      homeHtml,
+      /<meta name="description" content="Play Catan &amp; &quot;Friends&quot; &lt;Game&gt; with friends/,
+    );
     const robots = await fetch(url + "/robots.txt");
     assert.equal(robots.status, 200);
     assert.match(await robots.text(), /User-agent: \*\s+Disallow: \//);

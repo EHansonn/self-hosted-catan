@@ -1053,6 +1053,49 @@ export function App() {
   const specialBuildLabel = specialBuildQueued
     ? `Cancel special build phase queued after ${specialBuildPartner?.name || "your paired player's"} turn`
     : `Queue a special build phase after ${specialBuildPartner?.name || "your paired player's"} turn`;
+  const renderRosterPlayer = (p: (typeof rosterPlayers)[number]) => (
+    <div
+      className={`player-card ${current?.id === p.id ? "is-current" : ""} ${p.id === room?.me ? "is-you" : ""}`}
+      key={p.id}
+      data-animation-player={p.id}
+      style={{ "--player": p.color } as React.CSSProperties}
+      aria-current={current?.id === p.id ? "true" : undefined}
+      ref={current?.id === p.id ? currentPlayerCard : undefined}
+    >
+      {game ? <>
+        <div className="player-name">{p.name}{p.id === room?.host && <Crown size={12} />}</div>
+        <div className="player-score-avatar"><Avatar player={p} score={p.points} /></div>
+        <div className="player-card-stats">
+          <GameCard resource="unknown" count={p.cardCount} label={`${p.cardCount} resource cards`} />
+          <GameCard resource="development" count={p.devCount} label={`${p.devCount} development cards`} />
+          <span className={`achievement ${game.army === p.id ? "earned" : ""}`} title="Knights played"><Sprite name="people" /><b>{p.knights}</b></span>
+          <span className={`achievement ${game.longest === p.id ? "earned" : ""}`} title="Longest road length"><Sprite name="route" /><b>{p.roadLength}</b></span>
+        </div>
+        {(!p.connected && !p.bot || p.automated) && <small className="player-presence">{p.automated ? "Bot assistance" : "Disconnected"}</small>}
+      </> : <>
+        {p.id === room?.me && !p.bot ? (
+          <button
+            className="player-color-trigger"
+            type="button"
+            aria-label={`Choose your player color. Current color: ${PLAYER_COLORS.find(({ value }) => value === p.color)?.label || p.color}`}
+            title="Choose your color"
+            disabled={pending}
+            onClick={() => setModal("color")}
+          >
+            <Avatar player={p} />
+            <span className="player-color-edit" aria-hidden="true">
+              <Palette />
+            </span>
+          </button>
+        ) : <Avatar player={p} />}
+        <div className="player-info"><strong>{p.name}{p.id === room?.me && <small> YOU</small>}</strong><span>{p.bot ? `${p.difficulty} bot` : "At the table"}</span></div>
+        <span className={`pregame-ready ${!p.bot && !p.connected ? "offline" : ""}`}>
+          {p.bot ? "BOT" : p.connected ? "READY" : "OFFLINE"}
+        </span>
+        {host && p.id !== room?.host && <button className="icon-btn" aria-label={`Remove ${p.name}`} onClick={() => command({ type: "remove", id: p.id })}><X size={14} /></button>}
+      </>}
+    </div>
+  );
   const roster = (
     <aside className={`crew-panel ${room && !game ? "pregame-players" : ""}`}>
       <div className="panel-title">
@@ -1061,51 +1104,16 @@ export function App() {
           {room ? `${room.players.length}/${room.options.seats}` : "2–12"}
         </span>
       </div>
-      {room ? (
-        rosterPlayers.map((p) => (
-          <div
-            className={`player-card ${current?.id === p.id ? "is-current" : ""} ${p.id === room.me ? "is-you" : ""}`}
-            key={p.id}
-            data-animation-player={p.id}
-            style={{ "--player": p.color } as React.CSSProperties}
-            aria-current={current?.id === p.id ? "true" : undefined}
-            ref={current?.id === p.id ? currentPlayerCard : undefined}
-          >
-            {game ? <>
-              <div className="player-name">{p.name}{p.id === room.host && <Crown size={12} />}</div>
-              <div className="player-score-avatar"><Avatar player={p} score={p.points} /></div>
-              <div className="player-card-stats">
-                <GameCard resource="unknown" count={p.cardCount} label={`${p.cardCount} resource cards`} />
-                <GameCard resource="development" count={p.devCount} label={`${p.devCount} development cards`} />
-                <span className={`achievement ${game.army === p.id ? "earned" : ""}`} title="Knights played"><Sprite name="people" /><b>{p.knights}</b></span>
-                <span className={`achievement ${game.longest === p.id ? "earned" : ""}`} title="Longest road length"><Sprite name="route" /><b>{p.roadLength}</b></span>
-              </div>
-              {(!p.connected && !p.bot || p.automated) && <small className="player-presence">{p.automated ? "Bot assistance" : "Disconnected"}</small>}
-            </> : <>
-              {p.id === room.me && !p.bot ? (
-                <button
-                  className="player-color-trigger"
-                  type="button"
-                  aria-label={`Choose your player color. Current color: ${PLAYER_COLORS.find(({ value }) => value === p.color)?.label || p.color}`}
-                  title="Choose your color"
-                  disabled={pending}
-                  onClick={() => setModal("color")}
-                >
-                  <Avatar player={p} />
-                  <span className="player-color-edit" aria-hidden="true">
-                    <Palette />
-                  </span>
-                </button>
-              ) : <Avatar player={p} />}
-              <div className="player-info"><strong>{p.name}{p.id === room.me && <small> YOU</small>}</strong><span>{p.bot ? `${p.difficulty} bot` : "At the table"}</span></div>
-              <span className={`pregame-ready ${!p.bot && !p.connected ? "offline" : ""}`}>
-                {p.bot ? "BOT" : p.connected ? "READY" : "OFFLINE"}
-              </span>
-              {host && p.id !== room.host && <button className="icon-btn" aria-label={`Remove ${p.name}`} onClick={() => command({ type: "remove", id: p.id })}><X size={14} /></button>}
-            </>}
+      {room ? game ? <>
+        <div className="roster-opponents" aria-label="Other players">
+          {rosterPlayers.filter((p) => p.id !== room.me).map(renderRosterPlayer)}
+        </div>
+        {rosterPlayers.filter((p) => p.id === room.me).map((p) => (
+          <div className="roster-self" key={p.id} aria-label="Your player card">
+            {renderRosterPlayer(p)}
           </div>
-        ))
-      ) : (
+        ))}
+      </> : rosterPlayers.map(renderRosterPlayer) : (
         <div className="empty-crew">
           <Users size={28} />
           <p>A seat for every friend.</p>

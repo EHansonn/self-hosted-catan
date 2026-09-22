@@ -83,6 +83,16 @@ if (
   throw new Error(
     "APP_NAME must be between 1 and 48 characters and cannot contain control characters.",
   );
+const escapedAppName = appName.replace(/[&<>"']/g, (character) => {
+  const entities: Record<string, string> = {
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  };
+  return entities[character];
+});
 const allowedOrigins = new Set(
   (process.env.ALLOWED_ORIGINS || "")
     .split(",")
@@ -591,6 +601,16 @@ const server = http.createServer(async (req, res) => {
         ? "public, max-age=31536000, immutable"
         : "no-cache",
     );
+    if (file === resolve(staticDir, "index.html")) {
+      if (req.method === "HEAD") return res.end();
+      const html = readFileSync(file, "utf8")
+        .replace(/<title>[^<]*<\/title>/, `<title>${escapedAppName}</title>`)
+        .replace(
+          /<meta name="description" content="[^"]*"/,
+          `<meta name="description" content="Play ${escapedAppName} with friends or bots in a private 2D or 3D game."`,
+        );
+      return res.end(html);
+    }
     if (req.method === "HEAD") return res.end();
     const stream = createReadStream(file);
     stream.on("error", () => {
