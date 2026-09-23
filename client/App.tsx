@@ -1971,31 +1971,7 @@ export function App() {
           </section>
         )}
         {room && !game && roster}
-        {game && <section className={`table-area ${spectator ? "is-spectating" : ""}`}>
-          <div className="table-heading">
-            <div>
-              <span className="eyebrow">
-                {game
-                  ? `ROUND ${Math.ceil(game.turn / (game.players.length * (game.options.paired && game.players.length > 4 ? 2 : 1))) || 1}${game.secondary ? " · SPECIAL BUILD PHASE" : ""}`
-                  : `PLAY ${appName.toLocaleUpperCase()}`}
-              </span>
-              <h1>
-                {game ? gameModeName(room?.options.seats || 4) : appName}
-              </h1>
-              {spectator && (
-                <span className="spectator-badge">
-                  <Eye size={14} /> Spectating
-                </span>
-              )}
-            </div>
-            <span className="table-format">
-              {boardProfileForPlayers(room?.options.seats || 4).name}
-              <small>
-                {room?.options.seats || 4} seats · {room?.options.target || 10}{" "}
-                points
-              </small>
-            </span>
-          </div>
+        {game && <section className="table-area" aria-label="Game table">
           <BoardView
             board={board}
             players={boardPlayers}
@@ -2061,6 +2037,11 @@ export function App() {
                   {current && <Avatar player={current} />}
                   <div>
                     <strong>{phaseText}</strong>
+                    {spectator && (
+                      <small className="spectator-badge">
+                        <Eye size={14} /> Spectating
+                      </small>
+                    )}
                   </div>
                   {myTurn && game.phase === "roll" && !game.options.autoRollDice && (
                     <button
