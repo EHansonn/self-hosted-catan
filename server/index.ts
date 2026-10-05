@@ -71,6 +71,12 @@ import {
   unattendedGameExpired,
 } from "../shared/room-lifecycle";
 import {
+  RESOURCES,
+  configureResourceNames,
+  getResourceNames,
+  resolveResourceNames,
+} from "../shared/resources";
+import {
   NEW_ROOM_CODE_LENGTH,
   ROOM_CODE_PATTERN,
 } from "../shared/room-code";
@@ -80,6 +86,7 @@ const port = Number(process.env.PORT || 3001),
 const dataDir = resolve(process.env.DATA_DIR || "data"),
   staticDir = resolve(process.env.STATIC_DIR || "dist/client");
 const appName = (process.env.APP_NAME || "Crossroads").trim();
+configureResourceNames(resolveResourceNames(process.env));
 if (
   !appName ||
   appName.length > 48 ||
@@ -516,7 +523,7 @@ const server = http.createServer(async (req, res) => {
     if (path === "/api/health")
       return json(res, 200, { ok: true, name: appName });
     if (path === "/api/config" && req.method === "GET")
-      return json(res, 200, { appName });
+      return json(res, 200, { appName, resourceNames: getResourceNames() });
     if (path === "/api/session" && req.method === "GET") {
       let s = getSession(req);
       if (!s) {
@@ -757,7 +764,7 @@ const optionsSchema = z.object({
   paired: z.boolean(),
   showDiscardedCards: z.boolean().default(true),
 });
-const resource = z.enum(["wood", "brick", "sheep", "wheat", "ore"]);
+const resource = z.enum(RESOURCES);
 const playerName = z
   .string()
   .trim()

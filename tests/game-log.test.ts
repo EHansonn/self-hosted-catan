@@ -115,3 +115,17 @@ test("discard history renders each revealed resource card", () => {
   assert.match(markup, /game-card brick/);
   assert.match(markup, /card-count[^>]*>2</);
 });
+
+test("detailed trade history renders the offered and received card stacks", () => {
+  const markup = renderToStaticMarkup(
+    createElement(LogMessage, {
+      text: "Mira trades 2 wood to Atlas for 1 ore.",
+      actor: { name: "Mira", color: "#52c9cf" },
+    }),
+  );
+
+  assert.match(markup, /log-player-name/);
+  assert.match(markup, /game-card wood/);
+  assert.match(markup, /game-card ore/);
+  assert.match(markup, /card-count/);
+});

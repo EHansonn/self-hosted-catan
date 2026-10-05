@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { TERRAIN, type BoardProps, type BuildPiece } from "./Board";
+import { RESOURCES, resourceName } from "../shared/resources";
 import {
   harborLabelPosition,
   harborTransformForEdge,
@@ -663,7 +664,7 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
         const spriteIndex =
           resource === "any"
             ? 5
-            : ["wood", "brick", "sheep", "wheat", "ore"].indexOf(resource);
+            : RESOURCES.indexOf(resource);
         const cellWidth = image.naturalWidth / 4;
         const cellHeight = image.naturalHeight / 4;
         ctx.drawImage(
@@ -797,7 +798,7 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
       badgeFace.rotation.x = -Math.PI / 2;
 
       const description = document.createElement("span");
-      const portName = resource === "any" ? "General" : TERRAIN[resource].label;
+      const portName = resource === "any" ? "General" : resourceName(resource);
       description.className = "sr-only";
       description.setAttribute("role", "img");
       description.setAttribute(

@@ -54,7 +54,8 @@ import { NativeSelect } from "@/components/ui/native-select";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BoardPreview, BoardView, TERRAIN } from "./Board";
+import { BoardPreview, BoardView } from "./Board";
+import { formatResourceHand, resourceName } from "../shared/resources";
 import { getAppName } from "./branding";
 import { affordableBuildOptions } from "./buildDiscovery";
 import { addCardToSelection } from "./cardSelection";
@@ -213,7 +214,7 @@ function CardPicker({
               resource={r}
               count={resourceLimit - value[r]}
               disabled={value[r] >= resourceLimit || selectionFull}
-              label={`Add ${TERRAIN[r].label} to ${label}`}
+              label={`Add ${resourceName(r)} to ${label}`}
               onClick={() =>
                 onChange(
                   addCardToSelection(value, r, resourceLimit, maxTotal),
@@ -1326,11 +1327,11 @@ export function App() {
       <ActionTile label={modal === "trade" ? "Cancel trade" : "Trade"} disabled={!active && modal !== "trade"} onClick={() => modal === "trade" ? setModal(null) : openTrade()}>
         {modal === "trade" ? <X /> : <span className="trade-action-art"><GameCard resource="wheat" /><ArrowLeftRight /><GameCard resource="brick" /></span>}
       </ActionTile>
-      <ActionTile label="Buy development card · 1 sheep, 1 wheat, 1 ore" disabled={!active || !canAfford(COSTS.development) || !game.deckCount} onClick={() => act({ type: "buyDev" })}><GameCard resource="development" /></ActionTile>
+      <ActionTile label={`Buy development card · ${formatResourceHand(COSTS.development)}`} disabled={!active || !canAfford(COSTS.development) || !game.deckCount} onClick={() => act({ type: "buyDev" })}><GameCard resource="development" /></ActionTile>
       {(["road", "settlement", "city"] as const).map(type => {
         const legal = type === "road" ? game.legal.roads : type === "city" ? game.legal.cities : game.legal.settlements;
         const count = type === "road" ? 15 - board.edges.filter(e => e.owner === room.me).length : type === "city" ? 4 - board.vertices.filter(v => v.owner === room.me && v.city).length : 5 - board.vertices.filter(v => v.owner === room.me && !v.city).length;
-        return <ActionTile key={type} label={`Build ${type} · ${RESOURCES.filter(r => COSTS[type][r]).map(r => `${COSTS[type][r]} ${r}`).join(", ")}`} count={count} selected={build === type} disabled={!active || !canAfford(COSTS[type]) || !legal.length} onClick={() => { setBuild(build === type ? null : type); setSelection(null); setModal(null); }}>
+        return <ActionTile key={type} label={`Build ${type} · ${formatResourceHand(COSTS[type])}`} count={count} selected={build === type} disabled={!active || !canAfford(COSTS[type]) || !legal.length} onClick={() => { setBuild(build === type ? null : type); setSelection(null); setModal(null); }}>
           <Sprite name={type} />
         </ActionTile>;
       })}
@@ -2118,7 +2119,7 @@ export function App() {
             {activity}
             <section className="bank-strip" aria-label="Bank resource supply">
               <Sprite name="bank" />
-              {RESOURCES.map(r => <GameCard key={r} resource={r} count={game.bank[r]} label={`${game.bank[r]} ${TERRAIN[r].label} in bank`} />)}
+              {RESOURCES.map(r => <GameCard key={r} resource={r} count={game.bank[r]} label={`${game.bank[r]} ${resourceName(r)} in bank`} />)}
               <GameCard resource="development" count={game.deckCount} label={`${game.deckCount} development cards in bank`} />
             </section>
             {roster}
@@ -2668,7 +2669,7 @@ export function App() {
             </div>
           ) : (
             <p className="muted">
-              No cards yet. Buy one for a sheep, wheat, and ore.
+              No cards yet. Buy one for {formatResourceHand(COSTS.development)}.
             </p>
           )}
           {activeResourceChoiceCard && (
@@ -2691,7 +2692,7 @@ export function App() {
                     key={resource}
                     resource={resource}
                     selected={devChoice[0] === resource}
-                    label={`Choose ${TERRAIN[resource].label}`}
+                    label={`Choose ${resourceName(resource)}`}
                     onClick={() => setDevChoice([resource, devChoice[1]])}
                   />
                 ))}
@@ -2705,7 +2706,7 @@ export function App() {
                         key={resource}
                         resource={resource}
                         selected={devChoice[1] === resource}
-                        label={`Choose ${TERRAIN[resource].label} as the second resource`}
+                        label={`Choose ${resourceName(resource)} as the second resource`}
                         onClick={() => setDevChoice([devChoice[0], resource])}
                       />
                     ))}

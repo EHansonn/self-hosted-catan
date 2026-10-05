@@ -8,6 +8,7 @@ import {
   type GameView,
 } from "../shared/game";
 import { deriveGameplayAnimation } from "../client/gameAnimations";
+import { DEFAULT_RESOURCE_NAMES, configureResourceNames, resolveResourceNames } from "../shared/resources";
 
 function view(): GameView {
   const players = Array.from({ length: 4 }, (_, index) =>
@@ -160,6 +161,30 @@ test("monopoly flies each stolen resource stack to the player who used it", () =
   ]);
   assert.equal(cue.roll, null);
   assert.deepEqual(cue.rolledTiles, []);
+});
+
+test("monopoly animation recognizes an overridden resource name", () => {
+  configureResourceNames(resolveResourceNames({ RESOURCE_NAME_ORE: "Stone" }));
+  try {
+    const previous = view();
+    previous.version = 50;
+    previous.players[1].cardCount = 2;
+    const next = structuredClone(previous);
+    next.version++;
+    next.players[1].cardCount = 0;
+    next.log.push({
+      id: (next.log.at(-1)?.id || 0) + 1,
+      player: "p0",
+      kind: "dev",
+      group: "turn-6",
+      text: "Player 0 plays Monopoly and takes 2 stone from the other players.",
+    });
+    assert.deepEqual(deriveGameplayAnimation(previous, next)?.resourceFlights, [
+      { resource: "ore", sourcePlayerId: "p1", playerId: "p0", amount: 2 },
+    ]);
+  } finally {
+    configureResourceNames(DEFAULT_RESOURCE_NAMES);
+  }
 });
 
 test("ordinary card-count changes do not create monopoly flights", () => {

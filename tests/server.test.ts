@@ -33,6 +33,7 @@ test("packaged server: guest joins, creator-only rooms, scaled tables, privacy, 
         HOST: "127.0.0.1",
         DATA_DIR: dir,
         APP_NAME: 'Catan & "Friends" <Game>',
+        RESOURCE_NAME_ORE: "Stone",
         ROOM_CREATE_PASSWORD: key,
         SECURE_COOKIE: "true",
         ALLOWED_ORIGINS: "https://catan.example",
@@ -160,6 +161,13 @@ test("packaged server: guest joins, creator-only rooms, scaled tables, privacy, 
     const config = await fetch(url + "/api/config");
     assert.deepEqual(await config.json(), {
       appName: 'Catan & "Friends" <Game>',
+      resourceNames: {
+        wood: "Wood",
+        brick: "Brick",
+        sheep: "Sheep",
+        wheat: "Wheat",
+        ore: "Stone",
+      },
     });
     const home = await fetch(url + "/");
     assert.equal(home.status, 200);

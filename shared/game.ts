@@ -1,5 +1,5 @@
-export const RESOURCES = ["wood", "brick", "sheep", "wheat", "ore"] as const;
-export type Resource = (typeof RESOURCES)[number];
+import { RESOURCES, formatResourceHand, resourceName, type Resource } from "./resources";
+export { RESOURCES, type Resource } from "./resources";
 export type Hand = Record<Resource, number>;
 export type Dev = "knight" | "roadBuilding" | "plenty" | "monopoly" | "victory";
 export type Difficulty = "easy" | "normal" | "hard";
@@ -1195,13 +1195,12 @@ export function produce(g: Game, roll: number) {
         received.set(id, hand);
       });
     else if (needed)
-      note(g, `The bank is short of ${r}; nobody receives it this roll.`);
+      note(g, `The bank is short of ${resourceName(r).toLowerCase()}; nobody receives it this roll.`);
   }
   for (const player of g.players) {
     const hand = received.get(player.id);
     if (!hand) continue;
-    const gains = RESOURCES.filter((r) => hand[r]).map((r) => `${hand[r]} ${r}`);
-    note(g, `${player.name} gets ${gains.join(" and ")}.`, "gain");
+    note(g, `${player.name} gets ${formatResourceHand(hand)}.`, "gain");
   }
 }
 
@@ -1258,14 +1257,22 @@ function settlePlayerTrade(g: Game, offer: Offer, recipient: Player) {
     from.resources[resource] += offer.want[resource] - offer.give[resource];
     recipient.resources[resource] += offer.give[resource] - offer.want[resource];
   });
-  note(g, `${recipient.name} trades with ${from.name}.`, "trade");
+  note(
+    g,
+    `${from.name} trades ${formatResourceHand(offer.give)} to ${recipient.name} for ${formatResourceHand(offer.want)}.`,
+    "trade",
+  );
   finishPlayerTrade(g);
 }
 export function expirePlayerTrade(game: Game): Game {
   const g = structuredClone(game);
   ensure(g.phase === "main" && g.offer, "There is no player trade to expire.");
   const from = g.players.find((player) => player.id === g.offer!.from)!;
-  note(g, `${from.name}'s trade offer expires.`, "trade");
+  note(
+    g,
+    `${from.name}'s trade offer expires: ${formatResourceHand(g.offer.give)} for ${formatResourceHand(g.offer.want)}.`,
+    "trade",
+  );
   finishPlayerTrade(g);
   g.version++;
   return g;
@@ -1295,7 +1302,7 @@ function stealCard(
   victim.resources[resource]--;
   thief.resources[resource]++;
   const publicText = `${thief.name} steals a card from ${victim.name}.`;
-  const revealedText = `${thief.name} steals 1 ${resource} from ${victim.name}.`;
+  const revealedText = `${thief.name} steals 1 ${resourceName(resource).toLowerCase()} from ${victim.name}.`;
   note(g, publicText, "action", undefined, {
     [thief.id]: revealedText,
     [victim.id]: revealedText,
@@ -1369,10 +1376,7 @@ function mutate(g: Game, id: string, a: Action, random?: RandomSource) {
     pay(g, p, a.cards);
     delete g.discards[id];
     const publicText = `${p.name} discards ${total(a.cards)} cards.`;
-    const revealedText = `${p.name} discards ${RESOURCES
-      .filter((resource) => a.cards[resource] > 0)
-      .map((resource) => `${a.cards[resource]} ${resource}`)
-      .join(" and ")}.`;
+    const revealedText = `${p.name} discards ${formatResourceHand(a.cards)}.`;
     note(
       g,
       g.options.showDiscardedCards ? revealedText : publicText,
@@ -1389,6 +1393,12 @@ function mutate(g: Game, id: string, a: Action, random?: RandomSource) {
   if (a.type === "cancelTrade") {
     ensure(g.phase === "main" && !g.secondary && g.offer &&
       (g.offer.from === id || g.players[g.current].id === id), "You cannot cancel that offer.");
+    const from = g.players.find((player) => player.id === g.offer!.from)!;
+    note(
+      g,
+      `${p.name} cancels ${from.name}'s offer of ${formatResourceHand(g.offer.give)} for ${formatResourceHand(g.offer.want)}.`,
+      "trade",
+    );
     finishPlayerTrade(g);
     return;
   }
@@ -1404,7 +1414,12 @@ function mutate(g: Game, id: string, a: Action, random?: RandomSource) {
     ensure(canPay(p, a.give), "You do not have the offered cards.");
     g.offer = { id: g.version + 1, from: id, to: editingOwnCounter ? offer.to : offer.from, give: a.give, want: a.want, approved: [], rejected: [] };
     resetDeadline(g);
-    note(g, `${p.name} makes a counteroffer.`, "trade");
+    const recipient = g.players.find((player) => player.id === g.offer!.to)!;
+    note(
+      g,
+      `${p.name} makes a counteroffer to ${recipient.name}: ${formatResourceHand(a.give)} for ${formatResourceHand(a.want)}.`,
+      "trade",
+    );
     return;
   }
   if (a.type === "accept" || a.type === "reject") {
@@ -1438,7 +1453,12 @@ function mutate(g: Game, id: string, a: Action, random?: RandomSource) {
           player.id !== offer.from && (!offer.to || player.id === offer.to),
       );
       if (responders.every((player) => offer.rejected.includes(player.id))) {
-        note(g, `Everyone declines ${g.players.find((player) => player.id === offer.from)!.name}'s trade offer.`, "trade");
+        const from = g.players.find((player) => player.id === offer.from)!;
+        note(
+          g,
+          `Everyone declines ${from.name}'s trade offer of ${formatResourceHand(offer.give)} for ${formatResourceHand(offer.want)}.`,
+          "trade",
+        );
         finishPlayerTrade(g);
       }
       return;
@@ -1450,7 +1470,7 @@ function mutate(g: Game, id: string, a: Action, random?: RandomSource) {
       offer.rejected = offer.rejected.filter((playerId) => playerId !== id);
       if (!offer.approved.includes(id)) {
         offer.approved.push(id);
-        note(g, `${p.name} approves ${from.name}'s trade offer.`, "trade");
+        note(g, `${p.name} approves ${from.name}'s trade offer of ${formatResourceHand(offer.give)} for ${formatResourceHand(offer.want)}.`, "trade");
       }
       return;
     }
@@ -1612,10 +1632,7 @@ function mutate(g: Game, id: string, a: Action, random?: RandomSource) {
         "The bank does not have those resources.",
       );
       a.resources.forEach((r) => draw(g, p, r, 1));
-      const gains = RESOURCES.filter((r) => h[r] > 0).map(
-        (r) => `${h[r]} ${r}`,
-      );
-      effect = ` and gets ${gains.join(" and ")}`;
+      effect = ` and gets ${formatResourceHand(h)}`;
     } else if (a.card === "monopoly") {
       ensure(
         a.resources?.length === 1 && RESOURCES.includes(a.resources[0]),
@@ -1630,7 +1647,7 @@ function mutate(g: Game, id: string, a: Action, random?: RandomSource) {
           p.resources[r] += v.resources[r];
           v.resources[r] = 0;
         });
-      effect = ` and takes ${taken} ${r} from the other players`;
+      effect = ` and takes ${taken} ${resourceName(r).toLowerCase()} from the other players`;
     } else if (a.card === "knight") {
       p.knights++;
       g.resumePhase = g.phase;
@@ -1690,15 +1707,9 @@ function mutate(g: Game, id: string, a: Action, random?: RandomSource) {
     );
     pay(g, p, a.give);
     RESOURCES.forEach((r) => draw(g, p, r, a.want[r]));
-    const offered = RESOURCES.filter((r) => a.give[r])
-      .map((r) => `${a.give[r]} ${r}`)
-      .join(" and ");
-    const requested = RESOURCES.filter((r) => a.want[r])
-      .map((r) => `${a.want[r]} ${r}`)
-      .join(" and ");
     note(
       g,
-      `${p.name} trades ${offered} with the bank for ${requested}.`,
+      `${p.name} trades ${formatResourceHand(a.give)} with the bank for ${formatResourceHand(a.want)}.`,
       "trade",
     );
     return;
@@ -1725,7 +1736,7 @@ function mutate(g: Game, id: string, a: Action, random?: RandomSource) {
       rejected: [],
     };
     resetDeadline(g);
-    note(g, `${p.name} offers a trade.`, "trade");
+    note(g, `${p.name} offers ${formatResourceHand(a.give)} for ${formatResourceHand(a.want)}.`, "trade");
     return;
   }
   if (a.type === "end") {

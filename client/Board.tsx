@@ -16,6 +16,7 @@ import {
   ZoomOut,
 } from "lucide-react";
 import type { Board, PublicPlayer, Resource } from "../shared/game";
+import { RESOURCES, resourceName } from "../shared/resources";
 import type { GameplayAnimationCue } from "./gameAnimations";
 import { harborTransformForEdge } from "./portOrientation";
 import { spriteViewBox } from "./sprites";
@@ -63,15 +64,17 @@ class BoardErrorBoundary extends Component<
 }
 export const TERRAIN: Record<
   Resource | "desert",
-  { col: number; row: number; color: string; label: string }
+  { col: number; row: number; color: string }
 > = {
-  wood: { col: 0, row: 0, color: "#0bb038", label: "Wood" },
-  wheat: { col: 1, row: 0, color: "#f6bf16", label: "Wheat" },
-  ore: { col: 2, row: 0, color: "#a3b1af", label: "Ore" },
-  sheep: { col: 0, row: 1, color: "#9cc614", label: "Sheep" },
-  brick: { col: 1, row: 1, color: "#eb6c28", label: "Brick" },
-  desert: { col: 2, row: 1, color: "#d8c780", label: "Desert" },
+  wood: { col: 0, row: 0, color: "#0bb038" },
+  wheat: { col: 1, row: 0, color: "#f6bf16" },
+  ore: { col: 2, row: 0, color: "#a3b1af" },
+  sheep: { col: 0, row: 1, color: "#9cc614" },
+  brick: { col: 1, row: 1, color: "#eb6c28" },
+  desert: { col: 2, row: 1, color: "#d8c780" },
 };
+export const terrainName = (terrain: Resource | "desert") =>
+  terrain === "desert" ? "Desert" : resourceName(terrain);
 // Font-independent number shapes keep the production tokens readable in iOS
 // Safari versions that intermittently omit SVG <text> while still painting the
 // surrounding token and probability pips.
@@ -131,7 +134,7 @@ function HarborDock2D({
   const signX = centerX + outwardX * 0.59;
   const signY = centerY + outwardY * 0.59;
   const ratio = resource === "any" ? "3:1" : "2:1";
-  const portName = resource === "any" ? "General" : TERRAIN[resource].label;
+  const portName = resource === "any" ? "General" : resourceName(resource);
   const sprite = resource === "any" ? "unknown" : resource;
   const dockTransform = `matrix(${tangentX} ${tangentY} ${outwardX} ${outwardY} ${centerX} ${centerY})`;
 
@@ -908,7 +911,7 @@ function Board2D({
             className={`${enabled ? "tile pickable" : ""}${rolled ? " rolled-tile" : ""}`}
             data-animation-tile={tile.id}
             {...(enabled ? activate(tile.id) : {})}
-            aria-label={`${tex.label} ${tile.number || ""}${enabled ? ", move robber here" : ""}`}
+            aria-label={`${terrainName(tile.terrain)} ${tile.number || ""}${enabled ? ", move robber here" : ""}`}
           >
             <defs>
               <clipPath id={`hex-${tile.id}`}>
@@ -958,7 +961,7 @@ function Board2D({
             />
             <polygon points={poly} transform={`translate(${tile.x} ${tile.y}) scale(.91) translate(${-tile.x} ${-tile.y})`} fill="none" stroke="#ffe4a4" strokeWidth=".035" opacity=".65" />
             {tile.terrain !== "desert" && (() => {
-              const index = ["wood", "brick", "sheep", "wheat", "ore"].indexOf(tile.terrain);
+              const index = RESOURCES.indexOf(tile.terrain);
               return <svg x={tile.x - .37} y={tile.y - .73} width=".74" height=".74" viewBox={`${index % 4} ${Math.floor(index / 4)} 1 1`} aria-hidden="true"><image href="/textures/game-sprites.png" width="4" height="4" /></svg>;
             })()}
             {tile.number > 0 && (

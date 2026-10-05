@@ -558,6 +558,46 @@ test("counteroffers preserve active-player trading, ownership and stale-offer sa
   g.secondary = true;
   assert.throws(() => applyAction(g, "p0", { type: "counter", offerId: counterId, give, want }), /available/);
 });
+test("trade history records exact offers, counteroffers, and exchanged cards", () => {
+  let g = setup(fresh());
+  g.phase = "main";
+  grant(g, "p0", { wood: 2 });
+  grant(g, "p1", { ore: 1 });
+  g = applyAction(g, "p0", {
+    type: "offer",
+    give: { ...emptyHand(), wood: 1 },
+    want: { ...emptyHand(), ore: 1 },
+  });
+  assert.equal(g.log.at(-1)?.text, "Player 0 offers 1 wood for 1 ore.");
+
+  g = applyAction(g, "p1", {
+    type: "counter",
+    offerId: g.offer!.id,
+    give: { ...emptyHand(), ore: 1 },
+    want: { ...emptyHand(), wood: 2 },
+  });
+  assert.equal(g.log.at(-1)?.text, "Player 1 makes a counteroffer to Player 0: 1 ore for 2 wood.");
+
+  g = applyAction(g, "p0", { type: "accept", offerId: g.offer!.id });
+  assert.equal(g.log.at(-1)?.text, "Player 1 trades 1 ore to Player 0 for 2 wood.");
+  invariant(g);
+});
+test("cancelled and expired trades retain their terms in history", () => {
+  let g = setup(fresh());
+  g.phase = "main";
+  grant(g, "p0", { wood: 1 });
+  const offer = {
+    type: "offer" as const,
+    give: { ...emptyHand(), wood: 1 },
+    want: { ...emptyHand(), ore: 1 },
+  };
+  g = applyAction(g, "p0", offer);
+  g = applyAction(g, "p0", { type: "cancelTrade" });
+  assert.equal(g.log.at(-1)?.text, "Player 0 cancels Player 0's offer of 1 wood for 1 ore.");
+  g = applyAction(g, "p0", offer);
+  g = expirePlayerTrade(g);
+  assert.equal(g.log.at(-1)?.text, "Player 0's trade offer expires: 1 wood for 1 ore.");
+});
 test("trade creators choose among approving players before cards move", () => {
   let g = setup(fresh());
   g.phase = "main";
@@ -587,6 +627,7 @@ test("trade creators choose among approving players before cards move", () => {
   assert.deepEqual(g.offer!.approved, []);
   assert.deepEqual(g.players.map((player) => player.resources), beforeInvalidApproval);
   g = applyAction(g, "p1", { type: "accept", offerId });
+  assert.equal(g.log.at(-1)?.text, "Player 1 approves Player 0's trade offer of 1 wood for 1 ore.");
   g = applyAction(g, "p2", { type: "accept", offerId });
   assert.deepEqual(g.offer!.approved, ["p1", "p2"]);
   assert.deepEqual(
@@ -614,6 +655,7 @@ test("trade creators choose among approving players before cards move", () => {
   g.players[2].resources.ore = approvedPlayerOre;
   g.bank.ore -= approvedPlayerOre;
   g = applyAction(g, "p0", { type: "accept", offerId, player: "p2" });
+  assert.equal(g.log.at(-1)?.text, "Player 0 trades 1 wood to Player 2 for 1 ore.");
   assert.equal(g.offer, null);
   assert.deepEqual(g.players[1].resources, beforeApproval[1]);
   assert.equal(g.players[2].resources.ore, beforeApproval[2].ore - 1);

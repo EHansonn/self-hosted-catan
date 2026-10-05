@@ -4,6 +4,7 @@ import {
   type GameView,
   type Resource,
 } from "../shared/game";
+import { resourceFromName } from "../shared/resources";
 
 export type AnimatedPiece = "road" | "settlement" | "city";
 
@@ -80,10 +81,11 @@ function monopolyResourceFlights(previous: GameView, next: GameView) {
   const entry = next.log.at(-1);
   if (entry?.kind !== "dev" || !entry.player) return [];
   const match = entry.text.match(
-    /\bplays Monopoly and takes \d+ (wood|brick|sheep|wheat|ore)\b/,
+    /\bplays Monopoly and takes \d+ (.+?) from the other players\./,
   );
   if (!match) return [];
-  const resource = match[1] as Resource;
+  const resource = resourceFromName(match[1]);
+  if (!resource) return [];
 
   return previous.players.flatMap((player): ResourceFlightAnimation[] => {
     if (player.id === entry.player) return [];

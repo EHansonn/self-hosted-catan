@@ -63,6 +63,17 @@ docker compose exec -T game cat /app/data/access-key
 The first build downloads the Node base image and application dependencies.
 Normal starts reuse the built image.
 
+### Rename resource cards
+
+Resource names are display-only settings. Set any of `RESOURCE_NAME_WOOD`,
+`RESOURCE_NAME_BRICK`, `RESOURCE_NAME_SHEEP`, `RESOURCE_NAME_WHEAT`, or
+`RESOURCE_NAME_ORE` in your local `.env`, then recreate the container with
+`docker compose up -d` (or the Compose file you use). For example,
+`RESOURCE_NAME_ORE=Stone` changes the card, board, harbor, and new game-log
+labels to Stone. Unset values keep the usual names. Saved game data still uses
+the stable keys `wood`, `brick`, `sheep`, `wheat`, and `ore`; existing log lines
+keep the names they had when written.
+
 ## Install a published container image
 
 Release publishers can provide a prebuilt image through any OCI-compatible

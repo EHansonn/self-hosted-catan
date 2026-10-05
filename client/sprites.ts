@@ -1,4 +1,4 @@
-import type { Resource } from "../shared/game";
+import { RESOURCES, type Resource } from "../shared/resources";
 
 export type SpriteName =
   | Resource
@@ -15,11 +15,7 @@ export type SpriteName =
   | "route";
 
 const sprites: SpriteName[] = [
-  "wood",
-  "brick",
-  "sheep",
-  "wheat",
-  "ore",
+  ...RESOURCES,
   "unknown",
   "development",
   "bank",

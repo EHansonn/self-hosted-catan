@@ -3,11 +3,11 @@ import { ArrowBigDown as ArrowDown, ArrowBigUp as ArrowUp, Check, ChevronsRight,
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { RESOURCES, bankTradeUnits, total, type Action, type Dev, type GameView, type Hand, type Offer, type PublicPlayer, type Resource } from "../shared/game";
+import { DEFAULT_RESOURCE_NAMES, getResourceNames, resourceFromName, resourceName } from "../shared/resources";
 import { spriteBackgroundPosition, type SpriteName } from "./sprites";
 import { tradeHandsForViewer } from "./tradePerspective";
 
 export type { SpriteName } from "./sprites";
-export const resourceNames = { wood: "Wood", brick: "Brick", sheep: "Sheep", wheat: "Wheat", ore: "Ore" };
 export function Sprite({ name, className = "" }: { name: SpriteName; className?: string }) {
   return <span aria-hidden="true" className={`game-sprite ${className}`} style={{ backgroundPosition: spriteBackgroundPosition(name) }} />;
 }
@@ -15,7 +15,7 @@ export function GameCard({ resource, count, label, onClick, disabled, selected =
   resource: Resource | "unknown" | "development"; count?: number; label?: string;
   onClick?: () => void; disabled?: boolean; selected?: boolean;
 }) {
-  const title = label || `${count ?? ""} ${resource === "unknown" ? "Resource cards" : resource === "development" ? "Development cards" : resourceNames[resource]}`.trim();
+  const title = label || `${count ?? ""} ${resource === "unknown" ? "Resource cards" : resource === "development" ? "Development cards" : resourceName(resource)}`.trim();
   const className = `game-card ${resource} ${count && count > 1 ? "stacked" : ""} ${selected ? "selected" : ""}`;
   const contents = <><span className="card-face"><Sprite name={resource} /></span>{count !== undefined && <b className="card-count">{count}</b>}</>;
   return onClick ? <button className={className} type="button" onClick={onClick} disabled={disabled} aria-label={title} title={title} aria-pressed={selected}>{contents}</button>
@@ -41,14 +41,23 @@ export function DevelopmentCard({ type, count, label }: { type: Dev; count?: num
   </span>;
 }
 type LogIcon = { sprite: SpriteName; count?: number; label: string; card: boolean; development?: Dev };
-const logAction = /\b(?:begins|got|gets|builds|upgrades|moves|plays|buys|claims|discards|steals|trades|offers|makes|wins|bank)\b/i;
-const logNoun = /\b(?:(\d+)\s+)?(development cards?|dev cards?|year of plenty|road building|largest army|longest road|monopoly|knights?|robber|settlements?|cities|city|roads?|wood|bricks?|sheep|wheat|ore|cards?|bank)\b/gi;
+const logAction = /\b(?:begins|got|gets|builds|upgrades|moves|plays|buys|claims|discards|steals|trades|offers|makes|wins|bank|approves|declines|cancels|expires)\b/i;
+const logNouns = "development cards?|dev cards?|year of plenty|road building|largest army|longest road|monopoly|knights?|robber|settlements?|cities|city|roads?|cards?|bank";
+const escapePattern = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+function logNounPattern(): RegExp {
+  const names = [...new Set([
+    ...RESOURCES,
+    "bricks",
+    ...Object.values(DEFAULT_RESOURCE_NAMES),
+    ...Object.values(getResourceNames()),
+  ])].sort((a, b) => b.length - a.length).map(escapePattern);
+  return new RegExp(`\\b(?:(\\d+)\\s+)?(${logNouns}|${names.join("|")})\\b`, "gi");
+}
 function logIcon(term: string, count?: number): LogIcon {
   const noun = term.toLowerCase();
-  if (noun === "wood" || noun === "sheep" || noun === "wheat" || noun === "ore")
-    return { sprite: noun, count, label: resourceNames[noun], card: true };
-  if (noun === "brick" || noun === "bricks")
-    return { sprite: "brick", count, label: resourceNames.brick, card: true };
+  const resource = resourceFromName(noun);
+  if (resource)
+    return { sprite: resource, count, label: resourceName(resource), card: true };
   if (noun === "year of plenty")
     return { sprite: "development", label: term, card: true, development: "plenty" };
   if (noun === "road building")
@@ -93,7 +102,7 @@ export function LogMessage({
       ]
     : [prefix];
   let cursor = 0;
-  for (const match of action.matchAll(logNoun)) {
+  for (const match of action.matchAll(logNounPattern())) {
     const index = match.index;
     if (index > cursor) visual.push(action.slice(cursor, index));
     const count = match[1] ? Number(match[1]) : undefined;
@@ -133,7 +142,7 @@ export function Dice({ values, onRoll, disabled = false }: { values: number[]; o
     : <div className="game-dice" role="img" aria-label={values.length ? `Dice ${values.join(" and ")}` : "Dice not rolled"}>{dice}</div>;
 }
 export function CardRow({ hand, onRemove, onSelect, label }: { hand: Hand; onRemove?: (r: Resource) => void; onSelect?: (r: Resource) => void; label: string }) {
-  return <div className="cards-row" role="group" aria-label={label}>{RESOURCES.filter(r => hand[r] > 0).map(r => <GameCard key={r} resource={r} count={hand[r]} label={onRemove ? `Remove ${resourceNames[r]} from ${label}` : onSelect ? `Trade ${resourceNames[r]}` : `${hand[r]} ${resourceNames[r]}`} onClick={onRemove ? () => onRemove(r) : onSelect ? () => onSelect(r) : undefined} />)}</div>;
+  return <div className="cards-row" role="group" aria-label={label}>{RESOURCES.filter(r => hand[r] > 0).map(r => <GameCard key={r} resource={r} count={hand[r]} label={onRemove ? `Remove ${resourceName(r)} from ${label}` : onSelect ? `Trade ${resourceName(r)}` : `${hand[r]} ${resourceName(r)}`} onClick={onRemove ? () => onRemove(r) : onSelect ? () => onSelect(r) : undefined} />)}</div>;
 }
 export function TradeComposer({ open, onClose, game, me, hand, give, want, setGive, setWant, enabled, act, counterId }: {
   open: boolean; onClose: () => void; game: GameView; me: PublicPlayer; hand: Hand; give: Hand; want: Hand;
@@ -179,7 +188,7 @@ export function TradeComposer({ open, onClose, game, me, hand, give, want, setGi
         </div>
         <div className="trade-palette cream-tray" aria-label="Choose resources to receive">
           <span className="trade-palette-label">Request</span>
-          {RESOURCES.map(r => <GameCard key={r} resource={r} label={`Request ${resourceNames[r]}`} disabled={give[r] > 0 || want[r] >= 19} onClick={() => setWant({ ...want, [r]: want[r] + 1 })} />)}
+          {RESOURCES.map(r => <GameCard key={r} resource={r} label={`Request ${resourceName(r)}`} disabled={give[r] > 0 || want[r] >= 19} onClick={() => setWant({ ...want, [r]: want[r] + 1 })} />)}
           <span className="trade-bank-mark" title="Bank rates depend on your harbors"><Sprite name="bank" /></span>
         </div>
         <div className="trade-hand-palette cream-tray" aria-label="Choose resources from your hand to offer">
@@ -216,7 +225,7 @@ export function OfferPanel({ offer, players, me, enabled, act, onEdit }: { offer
   const canPay = RESOURCES.every(r => (recipient.resources?.[r] || 0) >= offer.want[r]);
   const missingCards = RESOURCES.flatMap(resource => {
     const missing = offer.want[resource] - (recipient.resources?.[resource] || 0);
-    return missing > 0 ? [`${missing} ${resourceNames[resource]}`] : [];
+    return missing > 0 ? [`${missing} ${resourceName(resource)}`] : [];
   });
   const broadcast = !offer.to;
   const approvedByMe = offer.approved.includes(me);
