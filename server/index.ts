@@ -51,7 +51,11 @@ import {
   canPay,
   total,
 } from "../shared/game";
-import { chooseBotAction, chooseTimeoutAction } from "../shared/bot";
+import {
+  chooseBotAction,
+  chooseTimeoutAction,
+  completeTimedOutFreeRoads,
+} from "../shared/bot";
 import {
   emptyCommunity,
   hydrateCommunity,
@@ -1677,6 +1681,11 @@ const tick = setInterval(
           continue;
         }
         if (g.deadline && Date.now() > g.deadline) {
+          if (g.phase === "freeRoad") {
+            room.game = completeTimedOutFreeRoads(g, secureRandom);
+            changed(room);
+            continue;
+          }
           if (g.phase === "main" && g.offer) {
             room.game = expirePlayerTrade(g);
             changed(room);

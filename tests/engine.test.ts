@@ -31,7 +31,11 @@ import {
   hasSpecialBuildAction,
   expirePlayerTrade,
 } from "../shared/game";
-import { chooseBotAction, chooseTimeoutAction } from "../shared/bot";
+import {
+  chooseBotAction,
+  chooseTimeoutAction,
+  completeTimedOutFreeRoads,
+} from "../shared/bot";
 const fresh = (n = 4, seed = 22, difficulty: Difficulty = "normal") =>
   createGame(
     Array.from({ length: n }, (_, i) =>
@@ -835,8 +839,9 @@ test("required actions, discards and main turns use their own clocks", () => {
   assert.equal(roads.phase, "freeRoad");
   assert.equal(roads.freeRoads, 1);
   assert.ok(roads.deadline! > Date.now() + 8000);
-  roads = applyAction(roads, "p0", { type: "skipRoad" });
+  roads = completeTimedOutFreeRoads(roads, () => 0);
   assert.equal(roads.phase, "main");
+  assert.equal(roads.freeRoads, 0);
   assert.ok(roads.deadline! > Date.now() + 57000);
   invariant(roads);
 });
@@ -970,15 +975,52 @@ test("a human turn timeout ends without spending cards or building", () => {
   assert.ok(roadSites(game, player).length > 0);
   assert.deepEqual(chooseTimeoutAction(game, player), { type: "end" });
 });
-test("a human free-road timeout skips instead of placing a road", () => {
-  const game = setup(fresh());
-  game.phase = "freeRoad";
-  game.resumePhase = "main";
-  game.freeRoads = 2;
+test("a Road Building timeout places both available roads immediately", () => {
+  let game = setup(fresh());
+  game.phase = "main";
+  game.deadline = Date.now() + 60_000;
   const player = game.players[game.current];
+  player.dev = [{ type: "roadBuilding", bought: game.turn - 1 }];
+  const resources = { ...player.resources };
+  const initialRoads = game.board.edges.filter((edge) => edge.owner === player.id).length;
 
-  assert.ok(roadSites(game, player).length > 0);
-  assert.deepEqual(chooseTimeoutAction(game, player), { type: "skipRoad" });
+  game = applyAction(game, player.id, { type: "dev", card: "roadBuilding" });
+  assert.equal(game.phase, "freeRoad");
+  assert.equal(game.freeRoads, 2);
+  const first = chooseTimeoutAction(game, game.players[game.current], undefined, () => 0);
+  assert.equal(first?.type, "road");
+  if (first?.type === "road")
+    assert.ok(roadSites(game, game.players[game.current]).includes(first.id));
+
+  game = completeTimedOutFreeRoads(game, () => 0);
+  assert.equal(game.phase, "main");
+  assert.equal(game.freeRoads, 0);
+  assert.equal(game.board.edges.filter((edge) => edge.owner === player.id).length, initialRoads + 2);
+  assert.deepEqual(game.players[game.current].resources, resources);
+  assert.ok(game.deadline! > Date.now() + 59_000);
+  invariant(game);
+});
+test("a Road Building timeout fills one remaining road and cannot skip a legal road", () => {
+  let game = setup(fresh());
+  game.phase = "main";
+  const player = game.players[game.current];
+  player.dev = [{ type: "roadBuilding", bought: game.turn - 1 }];
+  game = applyAction(game, player.id, { type: "dev", card: "roadBuilding" });
+  assert.throws(
+    () => applyAction(game, player.id, { type: "skipRoad" }),
+    /Place an available free road first/,
+  );
+  const first = chooseTimeoutAction(game, game.players[game.current], undefined, () => 0);
+  assert.equal(first?.type, "road");
+  game = applyAction(game, player.id, first!);
+  assert.equal(game.phase, "freeRoad");
+  assert.equal(game.freeRoads, 1);
+  const before = game.board.edges.filter((edge) => edge.owner === player.id).length;
+
+  game = completeTimedOutFreeRoads(game, () => 0);
+  assert.equal(game.phase, "main");
+  assert.equal(game.board.edges.filter((edge) => edge.owner === player.id).length, before + 1);
+  invariant(game);
 });
 test("expired discards preserve selected cards and fill only the remainder", () => {
   const game = fresh();

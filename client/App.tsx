@@ -2052,14 +2052,6 @@ export function App() {
                       <Dices size={18} /> Roll dice
                     </button>
                   )}
-                  {game.phase === "freeRoad" && myTurn && (
-                    <button
-                      className="btn subtle"
-                      onClick={() => act({ type: "skipRoad" })}
-                    >
-                      Skip
-                    </button>
-                  )}
                 </div>
                 {!room?.paused && (
                   <Clock

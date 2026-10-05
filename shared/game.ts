@@ -1659,6 +1659,7 @@ function mutate(g: Game, id: string, a: Action, random?: RandomSource) {
   }
   if (a.type === "skipRoad") {
     ensure(g.phase === "freeRoad", "No free roads to skip.");
+    ensure(!roadSites(g, p).length, "Place an available free road first.");
     g.freeRoads = 0;
     g.phase = g.resumePhase;
     restoreDeadline(g);

@@ -7,6 +7,7 @@ import {
   type RandomSource,
   RESOURCES,
   COSTS,
+  applyAction,
   canPay,
   citySites,
   emptyHand,
@@ -180,9 +181,27 @@ export function chooseTimeoutAction(
     return player === undefined ? null : { type: "steal", player };
   }
   if (g.phase === "freeRoad") {
-    return { type: "skipRoad" };
+    const id = randomItem(g, roadSites(g, p), random);
+    return id === undefined ? { type: "skipRoad" } : { type: "road", id };
   }
   return g.phase === "main" ? { type: "end" } : null;
+}
+export function completeTimedOutFreeRoads(
+  game: Game,
+  random?: RandomSource,
+): Game {
+  let next = game;
+  for (
+    let placed = 0;
+    placed < game.freeRoads && next.phase === "freeRoad";
+    placed++
+  ) {
+    const player = next.players[next.current];
+    const action = chooseTimeoutAction(next, player, undefined, random);
+    if (!action) break;
+    next = applyAction(next, player.id, action, random);
+  }
+  return next;
 }
 export function chooseBotAction(g: Game, p: Player): Action | null {
   if (g.phase === "finished") return null;
