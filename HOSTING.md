@@ -140,6 +140,7 @@ Caddy and nginx configurations. For a complete optional outbound setup, see
 | --- | --- | --- |
 | `APP_NAME` | `Crossroads` | Visible browser name; change it without rebuilding the image |
 | `ROOM_CREATE_PASSWORD` | Generated and saved in the data volume | Password required to create rooms; use at least 12 characters when set |
+| `REPLAYS_ENABLED` | `true` | Set to `false` to disable replay recording, download, import and verification UI/API |
 | `BIND_ADDRESS` | `127.0.0.1` | Host address used by the source and image Compose files |
 | `PORT` | `8080` | Host port used by the source and image Compose files |
 | `SECURE_COOKIE` | `false` | Set to `true` when browsers connect over HTTPS |
@@ -149,6 +150,18 @@ Caddy and nginx configurations. For a complete optional outbound setup, see
 
 The Cloudflare recipe has two additional settings documented in its own guide.
 Keep `.env` private and do not commit it.
+
+At the end of a recorded game, participants can download a JSON replay from
+the results screen. Settings → Watch replay imports it after this server
+verifies its signature. Replays include the public board, public action log,
+player names and public counts/scores, but not private hands, session IDs or
+creation passwords. A modified file or a file signed by another installation
+is rejected. The signing key is generated in the persistent game data volume
+(`replay-signing-key`, mode `0600`); retain it in backups if older downloads
+must remain playable. Changing `REPLAYS_ENABLED` requires recreating the
+container. Games already underway when recording is first enabled cannot
+produce a complete replay. Very long games that exceed the replay size/step
+limit continue normally, but their results will omit the download button.
 
 To change the visible product name, set a plain-text value and recreate the
 container. This does not rebuild the image or alter saved games:

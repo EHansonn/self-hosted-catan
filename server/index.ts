@@ -80,12 +80,18 @@ import {
   NEW_ROOM_CODE_LENGTH,
   ROOM_CODE_PATTERN,
 } from "../shared/room-code";
+import { MAX_REPLAY_BYTES, type ReplayPayload } from "../shared/replay";
+import { appendReplayFrame, signReplay, startReplay, verifyReplay } from "./replay";
 
 const port = Number(process.env.PORT || 3001),
   host = process.env.HOST || "127.0.0.1";
 const dataDir = resolve(process.env.DATA_DIR || "data"),
   staticDir = resolve(process.env.STATIC_DIR || "dist/client");
 const appName = (process.env.APP_NAME || "Crossroads").trim();
+const replaySetting = process.env.REPLAYS_ENABLED ?? "true";
+if (replaySetting !== "true" && replaySetting !== "false")
+  throw new Error("REPLAYS_ENABLED must be true or false.");
+const replaysEnabled = replaySetting === "true";
 configureResourceNames(resolveResourceNames(process.env));
 if (
   !appName ||
@@ -130,6 +136,18 @@ for (const origin of allowedOrigins) {
     );
 }
 mkdirSync(dataDir, { recursive: true, mode: 0o700 });
+const replayKeyFile = resolve(dataDir, "replay-signing-key");
+const replayKey = replaysEnabled
+  ? existsSync(replayKeyFile)
+    ? readFileSync(replayKeyFile)
+    : (() => {
+        const key = randomBytes(32);
+        writeFileSync(replayKeyFile, key, { flag: "wx", mode: 0o600 });
+        return key;
+      })()
+  : null;
+if (replayKey && replayKey.length !== 32)
+  throw new Error("Replay signing key must contain exactly 32 bytes.");
 const accessFile = resolve(dataDir, "access-key");
 let accessKey = process.env.ROOM_CREATE_PASSWORD || "";
 if (!accessKey) {
@@ -207,6 +225,8 @@ interface Room {
   leaderboardEligible?: boolean;
   startingHumanPlayers?: number;
   discardSelections?: Record<string, Hand>;
+  replay?: ReplayPayload;
+  replayUnavailable?: boolean;
 }
 const sessions = new Map<string, Session>(),
   rooms = new Map<string, Room>(),
@@ -245,6 +265,7 @@ if (existsSync(storePath)) {
       r.players.forEach((p) => (p.connected = false));
       r.game?.players.forEach((p) => (p.connected = false));
       if (r.game) {
+        if (!replaysEnabled) delete r.replay;
         r.game.options = { ...DEFAULT_OPTIONS, ...r.game.options };
         r.game.startedAt = Number.isFinite(r.game.startedAt)
           ? r.game.startedAt
@@ -523,7 +544,35 @@ const server = http.createServer(async (req, res) => {
     if (path === "/api/health")
       return json(res, 200, { ok: true, name: appName });
     if (path === "/api/config" && req.method === "GET")
-      return json(res, 200, { appName, resourceNames: getResourceNames() });
+      return json(res, 200, { appName, resourceNames: getResourceNames(), replaysEnabled });
+    if (path === "/api/replay/verify" && req.method === "POST") {
+      if (!replaysEnabled || !replayKey)
+        return json(res, 404, { error: "Replays are disabled." });
+      if (!getSession(req))
+        return json(res, 401, { error: "Start a player session first." });
+      if (!limit("replay-verify:" + ip, 8))
+        return json(res, 429, { error: "Too many replay checks. Try again later." });
+      if (Number(req.headers["content-length"] || 0) > MAX_REPLAY_BYTES + 1024)
+        return json(res, 413, { error: "Replay file is too large." });
+      let size = 0;
+      const chunks: Buffer[] = [];
+      for await (const chunk of req) {
+        size += chunk.length;
+        if (size > MAX_REPLAY_BYTES + 1024)
+          return json(res, 413, { error: "Replay file is too large." });
+        chunks.push(chunk);
+      }
+      let submitted: unknown;
+      try {
+        submitted = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+      } catch {
+        return json(res, 400, { error: "Invalid replay file." });
+      }
+      const verified = verifyReplay(submitted, replayKey);
+      if (!verified)
+        return json(res, 400, { error: "This is not a valid replay from this server." });
+      return json(res, 200, { replay: verified.payload });
+    }
     if (path === "/api/session" && req.method === "GET") {
       let s = getSession(req);
       if (!s) {
@@ -1115,6 +1164,9 @@ function announceGameResults(room: Room) {
   if (!room.game || room.game.phase !== "finished") return;
   const official = room.leaderboardEligible === true;
   const results = finalGameResults(room.game, room.code, official);
+  const replay = replaysEnabled && replayKey && !room.replayUnavailable && room.replay
+    ? signReplay(room.replay, replayKey)
+    : null;
   for (const socket of io.sockets.sockets.values()) {
     const session = socket.data.session as Session;
     if (
@@ -1123,7 +1175,7 @@ function announceGameResults(room: Room) {
         room.players.some((player) => player.id === session.id)) ||
         socket.data.spectator === true)
     )
-      socket.emit("game-results", results);
+      socket.emit("game-results", { ...results, ...(replay ? { replay } : {}) });
   }
 }
 function closeCompletedRoom(room: Room) {
@@ -1140,8 +1192,22 @@ function autoRollDice(room: Room) {
   const player = game.players[game.current];
   room.game = applyAction(game, player.id, { type: "roll" }, secureRandom);
 }
+function recordReplay(room: Room) {
+  const game = room.game;
+  if (!replaysEnabled || !game || !room.matchId || room.replayUnavailable) return;
+  if (room.replay?.matchId !== room.matchId) delete room.replay;
+  if (!room.replay) {
+    if (game.version !== 0) return;
+    room.replay = startReplay(game, room.matchId, room.code);
+  }
+  if (!appendReplayFrame(room.replay, game)) {
+    delete room.replay;
+    room.replayUnavailable = true;
+  }
+}
 function changed(room: Room) {
   autoRollDice(room);
+  recordReplay(room);
   if (room.discardSelections) {
     const activeDiscards =
       room.game?.phase === "discard" ? room.game.discards : {};
@@ -1545,6 +1611,8 @@ io.on("connection", (socket) => {
           secureRandom,
         );
         r.matchId = randomBytes(12).toString("hex");
+        delete r.replay;
+        delete r.replayUnavailable;
         r.recordedMatchId = undefined;
         r.startingHumanPlayers = r.players.filter((player) => !player.bot).length;
         r.leaderboardEligible = r.startingHumanPlayers >= 3;

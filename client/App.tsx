@@ -67,6 +67,9 @@ import {
   type ResourceChoiceDevelopmentCard,
 } from "./developmentCards";
 import { GameplayEffects } from "./GameplayEffects";
+import { ReplayViewer } from "./ReplayViewer";
+import { areReplaysEnabled } from "./features";
+import { MAX_REPLAY_BYTES, type ReplayPayload, type SignedReplay } from "../shared/replay";
 import { formatGameDuration } from "./duration";
 import {
   deriveGameplayAnimation,
@@ -113,6 +116,7 @@ import {
 } from "../shared/community";
 
 type Room = RoomView & { paused: boolean };
+type ReplayGameResults = GameResults & { replay?: SignedReplay };
 type Build = "road" | "settlement" | "city";
 type Command = Record<string, unknown>;
 type CommandResponse = {
@@ -284,8 +288,11 @@ export function App() {
     [room, setRoom] = useState<Room | null>(null),
     [resumeRooms, setResumeRooms] = useState<ResumeRoomView[]>([]),
     [community, setCommunity] = useState<CommunityView>(EMPTY_COMMUNITY),
-    [gameResults, setGameResults] = useState<GameResults | null>(null),
+    [gameResults, setGameResults] = useState<ReplayGameResults | null>(null),
     [pending, setPending] = useState(false);
+  const [loadedReplay, setLoadedReplay] = useState<ReplayPayload | null>(null);
+  const [loadingReplay, setLoadingReplay] = useState(false);
+  const replayFileInput = useRef<HTMLInputElement>(null);
   const [name, setName] = useState(""),
     [creationPassword, setCreationPassword] = useState(""),
     [code, setCode] = useState(
@@ -616,7 +623,7 @@ export function App() {
       setResumeRooms(games.filter((saved) => saved.phase !== "finished")),
     );
     s.on("community", (view: CommunityView) => setCommunity(view));
-    s.on("game-results", (results: GameResults) => setGameResults(results));
+    s.on("game-results", (results: ReplayGameResults) => setGameResults(results));
     s.on("room", (r: Room | null) => {
       const previous = roomRef.current;
       const ownLobbyPlayer = r && !r.game
@@ -1840,6 +1847,41 @@ export function App() {
       </form>
     </aside>
   ) : null;
+  const downloadReplay = (replay: SignedReplay) => {
+    const blob = new Blob([JSON.stringify(replay)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `game-replay-${replay.payload.roomCode}-${replay.payload.matchId}.json`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+  const importReplay = async (file: File | undefined) => {
+    if (!file) return;
+    if (file.size > MAX_REPLAY_BYTES + 1024) {
+      toast.error("Replay file is too large.");
+      return;
+    }
+    setLoadingReplay(true);
+    try {
+      const response = await fetch("/api/replay/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: await file.text(),
+      });
+      const data = await response.json() as { replay?: ReplayPayload; error?: string };
+      if (!response.ok || !data.replay) throw new Error(data.error || "Replay could not be verified.");
+      setModal(null);
+      setLoadedReplay(data.replay);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Replay could not be verified.");
+    } finally {
+      setLoadingReplay(false);
+    }
+  };
   return (
     <main className={`app ${game ? "in-game" : "in-lobby"} ${room && !game ? "pregame" : ""} ${!room ? "home" : ""}`}>
       <Toaster theme={darkMode ? "dark" : "light"} position="top-center" richColors closeButton />
@@ -2429,11 +2471,14 @@ export function App() {
               })}
             </div>
             <div className="game-results-actions">
+              {areReplaysEnabled() && gameResults.replay && <button className="btn subtle" type="button" onClick={() => downloadReplay(gameResults.replay!)}>Download replay (.json)</button>}
               <button className="btn primary" autoFocus onClick={() => setGameResults(null)}>Done</button>
             </div>
+            {areReplaysEnabled() && gameResults.replay && <p className="replay-download-note">Keep this file and use Settings → Watch replay later. It contains public game actions, not private hands.</p>}
           </div>
         </section>;
       })()}
+      {loadedReplay && <ReplayViewer replay={loadedReplay} onClose={() => setLoadedReplay(null)} />}
       {game && me && <TradeComposer open={modal === "trade"} onClose={() => setModal(null)} game={game} me={me} hand={hand} give={give} want={want} setGive={setGive} setWant={setWant} counterId={counterId} enabled={tradeInteractionEnabled} act={act} />}
       <Dialog
         open={modal === "color"}
@@ -2795,6 +2840,17 @@ export function App() {
               "These preferences apply only to this browser."
             )}
           </DialogDescription>
+          {areReplaysEnabled() && <section className="client-alert-settings replay-settings-action" aria-label="Replays">
+            <span><strong>Game replay</strong><small>Watch a saved replay created by this server.</small></span>
+            <input ref={replayFileInput} type="file" accept=".json,application/json" hidden aria-label="Choose replay file"
+              onChange={(event) => {
+                const file = event.currentTarget.files?.[0];
+                event.currentTarget.value = "";
+                void importReplay(file);
+              }} />
+            <button className="btn subtle" type="button" disabled={loadingReplay || !authenticated}
+              onClick={() => replayFileInput.current?.click()}>{loadingReplay ? "Checking…" : "Watch replay"}</button>
+          </section>}
           <section
             className="client-alert-settings client-theme-settings"
             aria-labelledby="appearance-settings"

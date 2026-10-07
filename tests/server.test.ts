@@ -2,12 +2,14 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import http from "node:http";
 import { spawn, type ChildProcess } from "node:child_process";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { io, type Socket } from "socket.io-client";
 import {
   COLORS,
+  createGame,
+  makePlayer,
   DEFAULT_OPTIONS,
   makeBoard,
   mapGenerationRules,
@@ -15,6 +17,7 @@ import {
   type ResumeRoomView,
   type Action,
 } from "../shared/game";
+import { appendReplayFrame, signReplay, startReplay } from "../server/replay";
 import type { CommunityView } from "../shared/community";
 type LiveRoomView = RoomView & { paused: boolean };
 const key = "test-only-crossroads-key",
@@ -25,7 +28,7 @@ test("packaged server: guest joins, creator-only rooms, scaled tables, privacy, 
   let proc: ChildProcess;
   const sockets: Socket[] = [];
   let logs = "";
-  const start = async () => {
+  const start = async (replaysEnabled = true) => {
     proc = spawn(process.execPath, ["dist/node/server.cjs"], {
       env: {
         ...process.env,
@@ -35,6 +38,7 @@ test("packaged server: guest joins, creator-only rooms, scaled tables, privacy, 
         APP_NAME: 'Catan & "Friends" <Game>',
         RESOURCE_NAME_ORE: "Stone",
         ROOM_CREATE_PASSWORD: key,
+        REPLAYS_ENABLED: String(replaysEnabled),
         SECURE_COOKIE: "true",
         ALLOWED_ORIGINS: "https://catan.example",
         BOT_INTERVAL_MS: "50",
@@ -161,6 +165,7 @@ test("packaged server: guest joins, creator-only rooms, scaled tables, privacy, 
     const config = await fetch(url + "/api/config");
     assert.deepEqual(await config.json(), {
       appName: 'Catan & "Friends" <Game>',
+      replaysEnabled: true,
       resourceNames: {
         wood: "Wood",
         brick: "Brick",
@@ -226,6 +231,32 @@ test("packaged server: guest joins, creator-only rooms, scaled tables, privacy, 
     stranger.close();
     const cookies: string[] = [];
     for (let i = 0; i < 6; i++) cookies.push(await createSession());
+    const replayKeyPath = join(dir, "replay-signing-key");
+    const replayKey = readFileSync(replayKeyPath);
+    assert.equal(replayKey.length, 32);
+    assert.equal(statSync(replayKeyPath).mode & 0o777, 0o600);
+    const sampleGame = createGame([makePlayer("secret-a", "Alice", 0), makePlayer("secret-b", "Bob", 1)],
+      { ...DEFAULT_OPTIONS, seats: 2 }, 16);
+    const sampleReplay = startReplay(sampleGame, "0123456789abcdef01234567", "ABC123");
+    assert.equal(appendReplayFrame(sampleReplay, sampleGame), true);
+    sampleGame.phase = "finished";
+    sampleGame.winner = sampleGame.players[0].id;
+    sampleGame.finishedAt = Date.now();
+    sampleGame.version++;
+    assert.equal(appendReplayFrame(sampleReplay, sampleGame), true);
+    const signedReplay = signReplay(sampleReplay, replayKey);
+    assert.ok(signedReplay);
+    const verify = (body: unknown, cookie?: string) => fetch(url + "/api/replay/verify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...(cookie ? { Cookie: cookie } : {}) },
+      body: JSON.stringify(body),
+    });
+    assert.equal((await verify(signedReplay)).status, 401);
+    const verifiedReplay = await verify(signedReplay, cookies[0]);
+    assert.equal(verifiedReplay.status, 200);
+    assert.deepEqual((await verifiedReplay.json() as { replay: unknown }).replay, sampleReplay);
+    assert.equal((await verify({ ...signedReplay, signature: "x".repeat(43) }, cookies[0])).status, 400);
+    assert.equal((await verify({ ...signedReplay, extra: true }, cookies[0])).status, 400);
     const clients: Awaited<ReturnType<typeof connect>>[] = [];
     for (const cookie of cookies) clients.push(await connect(cookie));
     const host = clients[0];
@@ -669,6 +700,9 @@ test("packaged server: guest joins, creator-only rooms, scaled tables, privacy, 
     const storedRoom = snapshot.rooms.find(
       (candidate: { code: string }) => candidate.code === code,
     );
+    assert.equal(storedRoom.replay.frames[0].version, 0);
+    assert.ok(storedRoom.replay.frames.length > 1);
+    assert.equal(JSON.stringify(storedRoom.replay).includes(cookies[0].split("=")[1]), false);
     assert.equal(storedRoom.mapSeed, selectedMapSeed);
     assert.equal(storedRoom.paused, true);
     assert.equal(storedRoom.game.deadline, null);
@@ -828,6 +862,12 @@ test("packaged server: guest joins, creator-only rooms, scaled tables, privacy, 
     assert.notEqual(manualRoller.state!.game!.phase, "roll");
     for (let i = 0; i < 150; i++) await restored.cmd({ type: "sync" });
     assert.equal((await restored.cmd({ type: "sync" })).ok, false);
+    sockets.forEach((socket) => socket.close());
+    await stop();
+    await start(false);
+    const disabledConfig = await fetch(url + "/api/config");
+    assert.equal((await disabledConfig.json() as { replaysEnabled: boolean }).replaysEnabled, false);
+    assert.equal((await verify(signedReplay, cookies[0])).status, 404);
   } finally {
     sockets.forEach((s) => s.close());
     await stop();

@@ -2,11 +2,13 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
 import { configureBrand, DEFAULT_APP_NAME, getAppName } from "./branding";
+import { configureReplays } from "./features";
 import { configureResourceNames, type ResourceNames } from "../shared/resources";
 import "./styles.css";
 import "./crossroads.css";
 import "./game-ui.css";
 import "./dark-mode.css";
+import "./replay.css";
 
 async function start() {
   try {
@@ -15,12 +17,15 @@ async function start() {
       const config = (await response.json()) as {
         appName?: unknown;
         resourceNames?: ResourceNames;
+        replaysEnabled?: unknown;
       };
       configureBrand(config.appName);
+      configureReplays(config.replaysEnabled === true);
       if (config.resourceNames) configureResourceNames(config.resourceNames);
     }
   } catch {
     configureBrand(DEFAULT_APP_NAME);
+    configureReplays(false);
   }
 
   const appName = getAppName();
