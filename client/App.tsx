@@ -1050,7 +1050,6 @@ export function App() {
     !spectator &&
     game.options.paired &&
     game.players.length > 4 &&
-    !game.secondary &&
     !game.phase.startsWith("setup") &&
     game.phase !== "finished" &&
     current?.id !== room.me

@@ -1184,6 +1184,35 @@ test("special build flags can be cancelled and cannot be changed on your own tur
   assert.equal(g.current, 1);
   assert.equal(g.secondary, false);
 });
+test("a waiting player can queue or cancel during someone else's special build phase", () => {
+  let g = setup(fresh(6));
+  g.players.forEach((player) => (player.bot = false));
+  g.specialBuildRequests = [];
+  g.phase = "main";
+  grant(g, "p3", { wood: 1, brick: 1 });
+  grant(g, "p4", { wood: 1, brick: 1 });
+  g = toggleSpecialBuildRequest(g, "p3");
+  g = applyAction(g, "p0", { type: "end" });
+  assert.equal(g.secondary, true);
+  assert.equal(g.current, 3);
+  assert.throws(() => toggleSpecialBuildRequest(g, "p3"), /another player's turn/);
+
+  g = toggleSpecialBuildRequest(g, "p4");
+  assert.deepEqual(g.specialBuildRequests, ["p4"]);
+  g = toggleSpecialBuildRequest(g, "p4");
+  assert.deepEqual(g.specialBuildRequests, []);
+  g = toggleSpecialBuildRequest(g, "p4");
+  g = applyAction(g, "p3", { type: "end" });
+  assert.equal(g.secondary, false);
+  assert.equal(g.current, 1);
+  assert.deepEqual(g.specialBuildRequests, ["p4"]);
+
+  g.phase = "main";
+  g = applyAction(g, "p1", { type: "end" });
+  assert.equal(g.secondary, true);
+  assert.equal(g.current, 4);
+  assert.deepEqual(g.specialBuildRequests, []);
+});
 test("bot special build flags are consumed and queued again", () => {
   let g = setup(fresh(6));
   g.phase = "main";

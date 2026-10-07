@@ -1341,7 +1341,6 @@ export function toggleSpecialBuildRequest(game: Game, playerId: string): Game {
     g.options.paired && g.players.length > 4,
     "Special build phases are not enabled for this game.",
   );
-  ensure(!g.secondary, "Wait for the normal turn before changing your request.");
   ensure(!g.phase.startsWith("setup"), "Special build phases begin after setup.");
   ensure(
     g.players.some((player) => player.id === playerId),
