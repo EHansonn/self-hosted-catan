@@ -15,6 +15,10 @@ import {
 const number = z.number().finite();
 const index = z.number().int().nonnegative();
 const owner = index.nullable();
+const resourceSchema = z.object({
+  wood: index, brick: index, sheep: index, wheat: index, ore: index,
+});
+const developmentSchema = z.enum(["knight", "roadBuilding", "plenty", "monopoly", "victory"]);
 const tileSchema = z.object({
   id: index, x: number, y: number,
   terrain: z.enum(["wood", "brick", "sheep", "wheat", "ore", "desert"]),
@@ -48,6 +52,8 @@ const frameSchema = z.object({
   buildings: z.array(z.tuple([owner, z.boolean()])).max(200),
   players: z.array(z.object({
     points: index, cardCount: index, devCount: index,
+    resources: resourceSchema,
+    developmentCards: z.array(developmentSchema).max(200),
     knights: index, roadLength: index, bot: z.boolean(),
   })).min(2).max(12),
   entries: z.array(z.object({
@@ -77,6 +83,9 @@ const replaySchema = z.object({
         frame.roadOwners.length !== replay.board.edges.length ||
         frame.buildings.length !== replay.board.vertices.length ||
         frame.players.length !== playerCount ||
+        frame.players.some((player) =>
+          Object.values(player.resources).reduce((sum, count) => sum + count, 0) !== player.cardCount ||
+          player.developmentCards.length !== player.devCount) ||
         frame.roadOwners.some((value) => value !== null && value >= playerCount) ||
         frame.buildings.some(([value]) => value !== null && value >= playerCount)) {
       context.addIssue({ code: "custom", message: "Invalid frame dimensions." });
@@ -126,7 +135,10 @@ export function appendReplayFrame(replay: ReplayPayload, game: Game): boolean {
       const visible = publicPlayer(game, player, "");
       return {
         points: visible.points, cardCount: visible.cardCount,
-        devCount: visible.devCount, knights: player.knights,
+        devCount: visible.devCount,
+        resources: { ...player.resources },
+        developmentCards: player.dev.map((card) => card.type),
+        knights: player.knights,
         roadLength: player.roadLength, bot: player.bot,
       };
     }),

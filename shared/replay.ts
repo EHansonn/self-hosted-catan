@@ -1,7 +1,7 @@
-import type { Board, Phase, PublicGameLogEntry } from "./game";
+import type { Board, Dev, Hand, Phase, PublicGameLogEntry } from "./game";
 
 export const REPLAY_FORMAT = "crossroads-server-replay";
-export const REPLAY_VERSION = 1;
+export const REPLAY_VERSION = 2;
 export const MAX_REPLAY_FRAMES = 2500;
 export const MAX_REPLAY_BYTES = 12 * 1024 * 1024;
 
@@ -14,6 +14,8 @@ export interface ReplayPlayerState {
   points: number;
   cardCount: number;
   devCount: number;
+  resources: Hand;
+  developmentCards: Dev[];
   knights: number;
   roadLength: number;
   bot: boolean;

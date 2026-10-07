@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Pause, Play, X } from "lucide-react";
 import { BoardView } from "./Board";
-import type { PublicPlayer } from "../shared/game";
+import { DevelopmentCard, GameCard } from "./GameUI";
+import { developmentCardCounts } from "./developmentCards";
+import { RESOURCES, type PublicPlayer } from "../shared/game";
+import { resourceName } from "../shared/resources";
 import type { ReplayPayload } from "../shared/replay";
 
 export function ReplayViewer({ replay, onClose }: { replay: ReplayPayload; onClose: () => void }) {
@@ -9,6 +12,7 @@ export function ReplayViewer({ replay, onClose }: { replay: ReplayPayload; onClo
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [mode, setMode] = useState<"2d" | "3d">("2d");
+  const [selectedPlayer, setSelectedPlayer] = useState(0);
   const logRef = useRef<HTMLOListElement>(null);
   const frame = replay.frames[position];
   const last = replay.frames.length - 1;
@@ -62,6 +66,9 @@ export function ReplayViewer({ replay, onClose }: { replay: ReplayPayload; onClo
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
   }, [position]);
   const active = players[frame.current];
+  const inspected = frame.players[selectedPlayer];
+  const inspectedName = replay.players[selectedPlayer].name;
+  const developmentCards = developmentCardCounts(inspected.developmentCards.map((type) => ({ type })));
 
   return <section className="replay-screen" role="dialog" aria-modal="true" aria-labelledby="replay-title">
     <header className="replay-header">
@@ -82,12 +89,29 @@ export function ReplayViewer({ replay, onClose }: { replay: ReplayPayload; onClo
           <span>Turn {frame.turn || "setup"} · {frame.phase.replace(/([A-Z])/g, " $1").toLowerCase()}</span>
         </div>
         <h3>Players</h3>
-        <ol className="replay-players">{players.map((player) => <li key={player.id}>
-          <span className="replay-player-color" style={{ backgroundColor: player.color }} />
-          <span>{player.name}{player.bot ? " (bot)" : ""}</span>
-          <b>{player.points} pts</b>
-          <small>{player.cardCount} cards · {player.devCount} development</small>
+        <ol className="replay-players">{players.map((player, index) => <li key={player.id}>
+          <button className="replay-player-button" type="button" aria-label={`Inspect ${player.name}'s hand`}
+            aria-pressed={selectedPlayer === index} onClick={() => setSelectedPlayer(index)}>
+            <span className="replay-player-color" style={{ backgroundColor: player.color }} />
+            <span>{player.name}{player.bot ? " (bot)" : ""}</span>
+            <b>{player.points} pts</b>
+            <small>{player.cardCount} cards · {player.devCount} development</small>
+          </button>
         </li>)}</ol>
+        <section className="replay-hand" aria-label={`${inspectedName}'s hand at step ${position + 1}`}>
+          <h3>{inspectedName}'s hand</h3>
+          <small>At this step · {inspected.cardCount} resources · {inspected.devCount} development</small>
+          <div className="replay-hand-group" aria-label="Resource cards">
+            {RESOURCES.filter((resource) => inspected.resources[resource] > 0).map((resource) =>
+              <GameCard key={resource} resource={resource} count={inspected.resources[resource]}
+                label={`${inspected.resources[resource]} ${resourceName(resource)}`} />)}
+            {inspected.cardCount === 0 && <span className="replay-hand-empty">No resource cards</span>}
+          </div>
+          <div className="replay-hand-group" aria-label="Development cards">
+            {developmentCards.map(({ type, count }) => <DevelopmentCard key={type} type={type} count={count} />)}
+            {inspected.devCount === 0 && <span className="replay-hand-empty">No development cards</span>}
+          </div>
+        </section>
         <h3>Game log</h3>
         <ol ref={logRef} className="replay-log" aria-label="Game log through selected step">
           {history.map((entry) => <li key={entry.id}>{entry.text}</li>)}

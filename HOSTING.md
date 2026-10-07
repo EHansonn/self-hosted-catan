@@ -153,9 +153,11 @@ Keep `.env` private and do not commit it.
 
 At the end of a recorded game, participants can download a JSON replay from
 the results screen. Settings → Watch replay imports it after this server
-verifies its signature. Replays include the public board, public action log,
-player names and public counts/scores, but not private hands, session IDs or
-creation passwords. A modified file or a file signed by another installation
+verifies its signature. Replays include the board, public action log, player
+names and each player's resource hand and development cards at every step.
+Anyone with a downloaded file can inspect these formerly private hands, so
+share it deliberately. Session IDs and creation passwords are not included.
+A modified file or a file signed by another installation
 is rejected. The signing key is generated in the persistent game data volume
 (`replay-signing-key`, mode `0600`); retain it in backups if older downloads
 must remain playable. Changing `REPLAYS_ENABLED` requires recreating the

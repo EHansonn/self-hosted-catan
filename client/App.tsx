@@ -2474,7 +2474,7 @@ export function App() {
               {areReplaysEnabled() && gameResults.replay && <button className="btn subtle" type="button" onClick={() => downloadReplay(gameResults.replay!)}>Download replay (.json)</button>}
               <button className="btn primary" autoFocus onClick={() => setGameResults(null)}>Done</button>
             </div>
-            {areReplaysEnabled() && gameResults.replay && <p className="replay-download-note">Keep this file and use Settings → Watch replay later. It contains public game actions, not private hands.</p>}
+            {areReplaysEnabled() && gameResults.replay && <p className="replay-download-note">Keep this file and use Settings → Watch replay later. It reveals every player's resource and development cards throughout the game. Anyone with the file can see them.</p>}
           </div>
         </section>;
       })()}
