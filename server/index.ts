@@ -848,7 +848,7 @@ function randomBotName(room: Room) {
   const used = new Set(room.players.map((player) => playerNameKey(player.name)));
   const available = BOT_NAMES.filter((name) => !used.has(playerNameKey(name)));
   if (available.length) return available[randomInt(available.length)];
-  let fallback = "";
+  let fallback: string;
   do fallback = `Bot ${randomInt(100, 1000)}`;
   while (used.has(playerNameKey(fallback)));
   return fallback;
