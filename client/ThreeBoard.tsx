@@ -1275,8 +1275,8 @@ export default function ThreeBoard(props: BoardProps & { reset: number }) {
     }
     const positionedTargets = highlights.length <= 72;
     for (const id of positionedTargets ? highlights : []) {
-      let x = 0,
-        z = 0;
+      let x: number;
+      let z: number;
       if (kind === "vertex") {
         const v = board.vertices[id];
         x = v.x;

@@ -353,6 +353,7 @@ async function main() {
     } catch (error) {
       throw new Error(
         `Could not start Chromium. Run "npx playwright install chromium" once, then retry.\n${error instanceof Error ? error.message : error}`,
+        { cause: error },
       );
     }
     await captureDesktop(baseUrl);
