@@ -333,6 +333,12 @@ test("packaged server: guest joins, creator-only rooms, scaled tables, privacy, 
       options: { ...host.state!.options, autoRollDice: true },
     })).ok);
     assert.equal(host.state!.options.autoRollDice, true);
+    assert.equal(host.state!.options.preventRepeatRobberTarget, true);
+    assert.ok((await host.cmd({
+      type: "options",
+      options: { ...host.state!.options, preventRepeatRobberTarget: false },
+    })).ok);
+    assert.equal(host.state!.options.preventRepeatRobberTarget, false);
     const code = host.state!.code;
     assert.match(code, /^[A-Z0-9]{6}$/);
     const duplicateName = await clients[1].cmd({

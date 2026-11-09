@@ -820,6 +820,7 @@ test("repeat robber targets are blocked across a player's turns for both sevens 
   game.players[1].resources.wheat = 3;
   game = applyAction(game, "p0", { type: "robber", id: target.id });
   assert.deepEqual(game.robberVictimsThisTurn.p0, ["p1"]);
+  assert.ok(!robberSites(game, game.players[0]).includes(repeatedTarget.id));
   assert.ok(!("robberVictimsThisTurn" in viewGame(game, "p2")));
   assert.ok(!("robberVictimsPreviousTurn" in viewGame(game, "p2")));
 
@@ -837,6 +838,12 @@ test("repeat robber targets are blocked across a player's turns for both sevens 
   assert.equal(seven.phase, "robber");
   assert.ok(!viewGame(seven, "p0").legal.robber.includes(repeatedTarget.id));
   assert.throws(() => applyAction(seven, "p0", { type: "robber", id: repeatedTarget.id }), /another eligible hex/);
+  const timeoutMove = chooseTimeoutAction(seven, seven.players[0]);
+  const botMove = chooseBotAction(seven, seven.players[0]);
+  assert.equal(timeoutMove?.type, "robber");
+  assert.equal(botMove?.type, "robber");
+  if (timeoutMove?.type === "robber") assert.notEqual(timeoutMove.id, repeatedTarget.id);
+  if (botMove?.type === "robber") assert.notEqual(botMove.id, repeatedTarget.id);
 
   let knight = structuredClone(game);
   knight.phase = "main";

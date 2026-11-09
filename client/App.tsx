@@ -3095,6 +3095,8 @@ export function App() {
               protects opponents on two or fewer visible points. By default,
               a player cannot target someone they robbed on their previous turn
               with either a 7 or a Knight; the lobby host can turn this off.
+              If no other hex is available, the robber can still move but cannot
+              steal from that protected player.
             </p>
             <h3>Development cards</h3>
             <p>
