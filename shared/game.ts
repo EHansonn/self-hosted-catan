@@ -135,6 +135,7 @@ export interface Options extends MapGenerationRules {
   balanced: boolean;
   autoRollDice: boolean;
   friendlyRobber: boolean;
+  preventRepeatRobberTarget: boolean;
   linkedTwoTwelve: boolean;
   paired: boolean;
   showDiscardedCards: boolean;
@@ -156,6 +157,7 @@ export const DEFAULT_OPTIONS: Options = {
   autoRollDice: false,
   ...DEFAULT_MAP_GENERATION_RULES,
   friendlyRobber: false,
+  preventRepeatRobberTarget: true,
   linkedTwoTwelve: false,
   paired: true,
   showDiscardedCards: true,
@@ -278,6 +280,8 @@ export interface Game {
   dice: number[];
   discards: Record<string, number>;
   victims: string[];
+  robberVictimsThisTurn: Record<string, string[]>;
+  robberVictimsPreviousTurn: Record<string, string[]>;
   freeRoads: number;
   longest: string | null;
   army: string | null;
@@ -337,7 +341,7 @@ export interface Legal {
   robber: number[];
   ratios: Hand;
 }
-export type GameView = Omit<Game, "rng" | "deck" | "players" | "resumeTime" | "log"> & {
+export type GameView = Omit<Game, "rng" | "deck" | "players" | "resumeTime" | "log" | "robberVictimsThisTurn" | "robberVictimsPreviousTurn"> & {
   players: PublicPlayer[];
   log: PublicGameLogEntry[];
   deckCount: number;
@@ -820,6 +824,8 @@ export function createGame(
     dice: [],
     discards: {},
     victims: [],
+    robberVictimsThisTurn: {},
+    robberVictimsPreviousTurn: {},
     freeRoads: 0,
     longest: null,
     army: null,
@@ -1048,7 +1054,7 @@ export function ratios(g: Game, p: Player): Hand {
   return rates;
 }
 export function robberSites(g: Game, p: Player) {
-  return g.board.tiles
+  const legal = g.board.tiles
     .filter(
       (t) =>
         t.id !== g.robber &&
@@ -1067,6 +1073,19 @@ export function robberSites(g: Game, p: Player) {
           })),
     )
     .map((t) => t.id);
+  if (!g.options.preventRepeatRobberTarget) return legal;
+  const protectedVictims = new Set([
+    ...(g.robberVictimsPreviousTurn?.[p.id] || []),
+    ...(g.robberVictimsThisTurn?.[p.id] || []),
+  ]);
+  const withoutRepeatTargets = legal.filter((tileId) =>
+    g.board.tiles[tileId].vertices.every((vertexId) => {
+      const owner = g.board.vertices[vertexId].owner;
+      return !owner || !protectedVictims.has(owner);
+    }),
+  );
+  // A 7 must still allow the robber to move if every other hex is occupied.
+  return withoutRepeatTargets.length ? withoutRepeatTargets : legal;
 }
 export function hasSpecialBuildAction(g: Game, p: Player) {
   if (
@@ -1218,6 +1237,13 @@ export function matchesProductionRoll(
 }
 function startTurn(g: Game) {
   g.turn++;
+  if (!g.secondary) {
+    const playerId = g.players[g.current].id;
+    g.robberVictimsPreviousTurn ??= {};
+    g.robberVictimsThisTurn ??= {};
+    g.robberVictimsPreviousTurn[playerId] = g.robberVictimsThisTurn[playerId] || [];
+    g.robberVictimsThisTurn[playerId] = [];
+  }
   g.offer = null;
   g.players[g.current].playedDev = false;
   g.phase = g.secondary ? "main" : "roll";
@@ -1301,6 +1327,10 @@ function stealCard(
   const resource = cards[Math.floor(randomValue(g, random) * cards.length)];
   victim.resources[resource]--;
   thief.resources[resource]++;
+  g.robberVictimsThisTurn ??= {};
+  const targeted = g.robberVictimsThisTurn[thief.id] || [];
+  if (!targeted.includes(victimId)) targeted.push(victimId);
+  g.robberVictimsThisTurn[thief.id] = targeted;
   const publicText = `${thief.name} steals a card from ${victim.name}.`;
   const revealedText = `${thief.name} steals 1 ${resourceName(resource).toLowerCase()} from ${victim.name}.`;
   note(g, publicText, "action", undefined, {
@@ -1582,6 +1612,9 @@ function mutate(g: Game, id: string, a: Action, random?: RandomSource) {
       (v): v is string =>
         !!v &&
         v !== id &&
+        (!g.options.preventRepeatRobberTarget ||
+          !g.robberVictimsPreviousTurn?.[id]?.includes(v) &&
+          !g.robberVictimsThisTurn?.[id]?.includes(v)) &&
         total(g.players.find((p) => p.id === v)!.resources) > 0,
     );
     note(g, `${p.name} moves the robber.`);
@@ -1798,6 +1831,8 @@ export function viewGame(g: Game, viewer: string): GameView {
     deck,
     players,
     resumeTime: _resumeTime,
+    robberVictimsThisTurn: _robberVictimsThisTurn,
+    robberVictimsPreviousTurn: _robberVictimsPreviousTurn,
     log,
     ...rest
   } = g;

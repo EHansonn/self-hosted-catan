@@ -760,6 +760,7 @@ const optionsSchema = z.object({
   allowSameNumbersTouch: z.boolean().default(true),
   allowSameResourcesTouch: z.boolean().default(false),
   friendlyRobber: z.boolean(),
+  preventRepeatRobberTarget: z.boolean().default(true),
   linkedTwoTwelve: z.boolean().default(false),
   paired: z.boolean(),
   showDiscardedCards: z.boolean().default(true),

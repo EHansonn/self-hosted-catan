@@ -1579,6 +1579,16 @@ export function App() {
           </button>
           <button
             type="button"
+            className={`setup-choice horizontal ${room.options.preventRepeatRobberTarget ? "selected" : ""}`}
+            aria-pressed={room.options.preventRepeatRobberTarget}
+            disabled={!host || pending}
+            onClick={() => updateRoomOptions({ preventRepeatRobberTarget: !room.options.preventRepeatRobberTarget })}
+          >
+            <span className="rule-sprite"><Sprite name="knight" /></span>
+            <span><strong>No Repeat Robber Target</strong><small>Don't rob the same player on consecutive turns</small></span>
+          </button>
+          <button
+            type="button"
             className={`setup-choice horizontal ${room.options.linkedTwoTwelve ? "selected" : ""}`}
             aria-pressed={room.options.linkedTwoTwelve}
             disabled={!host || pending}
@@ -3082,7 +3092,11 @@ export function App() {
               Players holding more than seven resources discard half, rounded
               down. The active player moves the robber to a different hex and
               steals one random card from an adjacent opponent. Friendly robber
-              protects opponents on two or fewer visible points.
+              protects opponents on two or fewer visible points. By default,
+              a player cannot target someone they robbed on their previous turn
+              with either a 7 or a Knight; the lobby host can turn this off.
+              If no other hex is available, the robber can still move but cannot
+              steal from that protected player.
             </p>
             <h3>Development cards</h3>
             <p>

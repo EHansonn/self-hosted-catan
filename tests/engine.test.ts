@@ -802,6 +802,89 @@ test("the robber can never remain on its current hex, including timeouts", () =>
     }
   }
 });
+test("repeat robber targets are blocked across a player's turns for both sevens and Knights", () => {
+  let game = fresh(3, 42);
+  game.options.paired = false;
+  game.phase = "robber";
+  game.resumePhase = "main";
+  game.turn = 1;
+  const target = game.board.tiles.find((tile) => tile.id !== game.robber &&
+    tile.vertices.some((vertexId) => game.board.vertices[vertexId].tiles.some((tileId) =>
+      tileId !== tile.id && tileId !== game.robber)))!;
+  const settlement = target.vertices.find((vertexId) =>
+    game.board.vertices[vertexId].tiles.some((tileId) =>
+      tileId !== target.id && tileId !== game.robber))!;
+  const repeatedTarget = game.board.tiles.find((tile) =>
+    tile.id !== target.id && tile.id !== game.robber && tile.vertices.includes(settlement))!;
+  game.board.vertices[settlement].owner = "p1";
+  game.players[1].resources.wheat = 3;
+  game = applyAction(game, "p0", { type: "robber", id: target.id });
+  assert.deepEqual(game.robberVictimsThisTurn.p0, ["p1"]);
+  assert.ok(!robberSites(game, game.players[0]).includes(repeatedTarget.id));
+  assert.ok(!("robberVictimsThisTurn" in viewGame(game, "p2")));
+  assert.ok(!("robberVictimsPreviousTurn" in viewGame(game, "p2")));
+
+  for (const playerId of ["p0", "p1", "p2"]) {
+    game.phase = "main";
+    game = applyAction(game, playerId, { type: "end" });
+  }
+  assert.equal(game.players[game.current].id, "p0");
+  assert.deepEqual(game.robberVictimsPreviousTurn.p0, ["p1"]);
+
+  let seven = structuredClone(game);
+  seven.phase = "roll";
+  let die = 0;
+  seven = applyAction(seven, "p0", { type: "roll" }, () => die++ === 0 ? 0 : 0.999);
+  assert.equal(seven.phase, "robber");
+  assert.ok(!viewGame(seven, "p0").legal.robber.includes(repeatedTarget.id));
+  assert.throws(() => applyAction(seven, "p0", { type: "robber", id: repeatedTarget.id }), /another eligible hex/);
+  const timeoutMove = chooseTimeoutAction(seven, seven.players[0]);
+  const botMove = chooseBotAction(seven, seven.players[0]);
+  assert.equal(timeoutMove?.type, "robber");
+  assert.equal(botMove?.type, "robber");
+  if (timeoutMove?.type === "robber") assert.notEqual(timeoutMove.id, repeatedTarget.id);
+  if (botMove?.type === "robber") assert.notEqual(botMove.id, repeatedTarget.id);
+
+  let knight = structuredClone(game);
+  knight.phase = "main";
+  knight.players[0].dev = [{ type: "knight", bought: knight.turn - 1 }];
+  knight = applyAction(knight, "p0", { type: "dev", card: "knight" });
+  assert.equal(knight.phase, "robber");
+  assert.ok(!viewGame(knight, "p0").legal.robber.includes(repeatedTarget.id));
+
+  const disabled = structuredClone(seven);
+  disabled.options.preventRepeatRobberTarget = false;
+  assert.ok(robberSites(disabled, disabled.players[0]).includes(repeatedTarget.id));
+  const repeat = applyAction(disabled, "p0", { type: "robber", id: repeatedTarget.id });
+  assert.deepEqual(repeat.robberVictimsThisTurn.p0, ["p1"]);
+
+  const away = robberSites(seven, seven.players[0]).find((tileId) =>
+    seven.board.tiles[tileId].vertices.every((vertexId) =>
+      seven.board.vertices[vertexId].owner === null));
+  assert.notEqual(away, undefined);
+  seven = applyAction(seven, "p0", { type: "robber", id: away! });
+  for (const playerId of ["p0", "p1", "p2"]) {
+    seven.phase = "main";
+    seven = applyAction(seven, playerId, { type: "end" });
+  }
+  assert.deepEqual(seven.robberVictimsPreviousTurn.p0, []);
+  assert.ok(robberSites(seven, seven.players[0]).includes(repeatedTarget.id));
+});
+test("repeat-target protection never prevents a required robber move", () => {
+  const game = fresh(2, 43);
+  game.phase = "robber";
+  game.turn = 2;
+  game.robberVictimsPreviousTurn.p0 = ["p1"];
+  game.players[1].resources.wheat = 2;
+  for (const tile of game.board.tiles)
+    game.board.vertices[tile.vertices[0]].owner = "p1";
+  const legal = robberSites(game, game.players[0]);
+  assert.ok(legal.length > 0);
+  const moved = applyAction(game, "p0", { type: "robber", id: legal[0] });
+  assert.equal(moved.phase, "main");
+  assert.deepEqual(moved.victims, []);
+  assert.equal(moved.players[1].resources.wheat, 2);
+});
 test("timed-out robber placement avoids the acting player's buildings when possible", () => {
   const game = setup(fresh(4, 39));
   game.phase = "robber";
