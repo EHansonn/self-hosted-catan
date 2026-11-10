@@ -7,14 +7,16 @@ import {
   type PublicPlayer,
 } from "../shared/game";
 
+import { GUILD_CONTRACTS } from "../shared/merchants";
+
 type TurnActionGame = Pick<
   GameView,
   "bank" | "deckCount" | "legal" | "turn"
->;
+> & Partial<Pick<GameView, "options" | "guildContracts" | "secondary">>;
 
 type TurnActionPlayer = Pick<
   PublicPlayer,
-  "dev" | "playedDev" | "resources"
+  "dev" | "playedDev" | "resources" | "guildDeliveries"
 >;
 
 export function hasRemainingTurnAction(
@@ -25,6 +27,10 @@ export function hasRemainingTurnAction(
   if (!hand) return false;
   const canAfford = (cost: Partial<Hand>) =>
     RESOURCES.every((resource) => hand[resource] >= (cost[resource] || 0));
+
+  if (game.options?.merchantsGuild && !game.secondary && (player.guildDeliveries ?? 0) < 4 &&
+    game.guildContracts?.some(id => canAfford(GUILD_CONTRACTS[id].cost)))
+    return true;
 
   if (
     (game.legal.roads.length && canAfford(COSTS.road)) ||

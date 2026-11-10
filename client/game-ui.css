@@ -579,3 +579,17 @@ button.game-card:disabled { opacity: .42; }
 @media(max-width: 760px) { .in-game .crew-panel { flex: none; overflow-x: auto; overflow-y: hidden; } }
 @media(max-width: 760px) { .in-game .roster-opponents,.in-game .roster-self { display: contents; } }
 @media(prefers-reduced-motion: reduce) { .die.rolled,.game-dice.dice-roll-control .die,.turn-clock.urgent,.in-game .player-card.is-current,.action-tile.end-turn-prompt,.tile-place-marker,.roll-tile-flash,.token.producing,.building-piece-arrival,.road-piece-arrival line,.robber-arrival,.resource-flight { animation: none; }.gameplay-effects { display: none; }.action-tile,button.game-card,.game-dice.dice-roll-control .die,.in-game .player-card { transition: none; } }
+
+.guild-panel { max-height: 80dvh; overflow: auto; }
+.guild-open { display: flex; align-items: center; gap: 5px; min-height: 44px; }
+.guild-panel h3, .guild-panel p { margin: 0 0 8px; }
+.guild-panel p, .guild-progress { font-size: 12px; }
+.guild-progress { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-bottom: 10px; }
+.guild-contracts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.guild-contract { display: flex; flex-direction: column; gap: 8px; padding: 10px; border: 1px solid currentColor; border-radius: 8px; font-size: 12px; }
+.guild-contract .btn { margin-top: auto; min-height: 36px; }
+.game-results-row.has-guild { grid-template-columns: minmax(175px, 1.55fr) repeat(6, minmax(72px, .72fr)) minmax(64px, .58fr); min-width: 840px; }
+@media (max-width: 600px) {
+  .guild-contracts { grid-template-columns: 1fr; }
+  .game-results-row.has-guild { grid-template-columns: repeat(2, minmax(0, 1fr)); min-width: 0; }
+}

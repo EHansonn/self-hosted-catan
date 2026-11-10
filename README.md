@@ -67,3 +67,19 @@ docker compose stop
 
 For LAN, remote, HTTPS, update and backup options, see
 [`HOSTING.md`](HOSTING.md).
+
+## Merchant Guilds (optional expansion)
+
+Enable **Merchant Guilds** in the lobby before starting. Three public contracts
+are available to everyone, drawn from eight designs. During your main turn after
+rolling, spend a contract's listed three resources to deliver it; those cards
+return to the bank and a different contract immediately replaces it. Finish any
+open player trade first. Deliveries are unavailable during paired special builds.
+You may deliver multiple contracts on a turn if you can afford them.
+
+Every two deliveries earn one public victory point, up to two points from four
+deliveries. After four deliveries, that player cannot claim further contracts.
+Guild points count toward the selected victory target and appear in final results.
+Bots can deliver contracts, and contracts and progress persist with saved games.
+Classic games keep the expansion disabled by default. This is an initial balance
+prototype; contract costs and scoring should be evaluated through playtesting.

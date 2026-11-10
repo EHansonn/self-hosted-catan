@@ -19,6 +19,8 @@ import {
   rng,
   total,
 } from "./game";
+import { GUILD_CONTRACTS } from "./merchants";
+
 const noise = (g: Game, n: number) => {
   const x = Math.sin(g.version * 77 + n * 13 + g.current * 31) * 43758.5453;
   return x - Math.floor(x);
@@ -310,6 +312,10 @@ export function chooseBotAction(g: Game, p: Player): Action | null {
       ? { type: "road", id: bestRoad(g, p, roads) }
       : { type: "skipRoad" };
   if (g.phase !== "main") return null;
+  if (g.options.merchantsGuild && !g.secondary && !g.offer && (p.guildDeliveries ?? 0) < 4) {
+    const id = g.guildContracts?.find((id) => canPay(p, GUILD_CONTRACTS[id].cost));
+    if (id !== undefined) return { type: "deliverContract", id };
+  }
   if (!p.playedDev) {
     const playable = p.dev.filter(
       (d) => d.bought < g.turn && d.type !== "victory",

@@ -755,6 +755,7 @@ const optionsSchema = z.object({
   ]).default(20),
   balanced: z.boolean(),
   autoRollDice: z.boolean().default(false),
+  merchantsGuild: z.boolean().default(false),
   allowSixEightTouch: z.boolean().default(false),
   allowTwoTwelveTouch: z.boolean().default(true),
   allowSameNumbersTouch: z.boolean().default(true),
@@ -791,6 +792,7 @@ const hand = z
   })
   .strict();
 const actionSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("deliverContract"), id: z.number().int().min(0).max(7) }),
   z.object({ type: z.literal("road"), id: z.number().int().min(0).max(200) }),
   ...(["settlement", "city", "robber"] as const).map((type) =>
     z.object({ type: z.literal(type), id: z.number().int().min(0).max(200) }),
