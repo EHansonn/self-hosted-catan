@@ -333,6 +333,17 @@ test("packaged server: guest joins, creator-only rooms, scaled tables, privacy, 
       options: { ...host.state!.options, autoRollDice: true },
     })).ok);
     assert.equal(host.state!.options.autoRollDice, true);
+    assert.equal(host.state!.options.merchantsGuild, false);
+    assert.ok((await host.cmd({
+      type: "options",
+      options: { ...host.state!.options, merchantsGuild: true },
+    })).ok);
+    assert.equal(host.state!.options.merchantsGuild, true);
+    assert.ok((await host.cmd({
+      type: "options",
+      options: { ...host.state!.options, merchantsGuild: false },
+    })).ok);
+
     assert.equal(host.state!.options.preventRepeatRobberTarget, true);
     assert.ok((await host.cmd({
       type: "options",

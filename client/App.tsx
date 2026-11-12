@@ -55,6 +55,7 @@ import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BoardPreview, BoardView } from "./Board";
+import { GUILD_CONTRACTS, guildPoints } from "../shared/merchants";
 import { formatResourceHand, resourceName } from "../shared/resources";
 import { getAppName } from "./branding";
 import { affordableBuildOptions } from "./buildDiscovery";
@@ -303,6 +304,7 @@ export function App() {
       id: number;
     } | null>(null),
     [modal, setModal] = useState<
+      | "guild"
       | "trade"
       | "cards"
       | "rules"
@@ -1559,6 +1561,16 @@ export function App() {
           </div>
           <button
             type="button"
+            className={`setup-choice horizontal ${room.options.merchantsGuild ? "selected" : ""}`}
+            aria-pressed={!!room.options.merchantsGuild}
+            disabled={!host || pending}
+            onClick={() => updateRoomOptions({ merchantsGuild: !room.options.merchantsGuild })}
+          >
+            <Anchor size={27} />
+            <span><strong>Merchant Guilds</strong><small>Deliver public contracts · 2 deliveries earn 1 point · max 2 points</small></span>
+          </button>
+          <button
+            type="button"
             className={`setup-choice horizontal ${room.options.autoRollDice ? "selected" : ""}`}
             aria-pressed={room.options.autoRollDice}
             disabled={!host || pending}
@@ -2001,6 +2013,7 @@ export function App() {
             onBuildPick={chooseBuildSite}
             overlay={game && room ? <>
               <div className="board-dice-cluster">
+                {game.options.merchantsGuild && <button type="button" className="btn cream-tray guild-open" onClick={() => setModal("guild")}><Anchor size={18} /> Guild contracts</button>}
                 {showSpecialBuildFlag && (
                   <button
                     className={`special-build-flag ${specialBuildQueued ? "is-queued" : ""}`}
@@ -2411,18 +2424,19 @@ export function App() {
               </div>
             </header>
             <div className="game-results-table" role="table" aria-label="Final victory point breakdown">
-              <div className="game-results-row game-results-labels" role="row">
+              <div className={`game-results-row game-results-labels ${gameResults.players.some(p => (p.guildPoints ?? 0) > 0) ? "has-guild" : ""}`} role="row">
                 <span role="columnheader">Player</span>
                 <span role="columnheader">Settlements</span>
                 <span role="columnheader">Cities</span>
                 <span role="columnheader">Longest road</span>
                 <span role="columnheader">Largest army</span>
                 <span role="columnheader">Victory cards</span>
+                {gameResults.players.some(p => (p.guildPoints ?? 0) > 0) && <span role="columnheader">Guild</span>}
                 <span role="columnheader">Total</span>
               </div>
               {gameResults.players.map((player, index) => {
                 const won = player.id === gameResults.winnerId;
-                return <div className={`game-results-row ${won ? "is-winner" : ""}`} role="row" key={player.id}>
+                return <div className={`game-results-row ${won ? "is-winner" : ""} ${gameResults.players.some(p => (p.guildPoints ?? 0) > 0) ? "has-guild" : ""}`} role="row" key={player.id}>
                   <div className="game-results-player" role="cell">
                     <b className="game-results-rank">{index + 1}</b>
                     <Avatar player={player} />
@@ -2434,6 +2448,7 @@ export function App() {
                   <span className="game-results-source" data-label="Longest road" role="cell"><Sprite name="route" /><b>{player.longestRoad}</b></span>
                   <span className="game-results-source" data-label="Largest army" role="cell"><Sprite name="knight" /><b>{player.largestArmy}</b></span>
                   <span className="game-results-source" data-label="Victory cards" role="cell"><Trophy /><b>{player.victoryCards}</b></span>
+                  {gameResults.players.some(p => (p.guildPoints ?? 0) > 0) && <span className="game-results-source" data-label="Guild" role="cell"><Anchor /><b>{player.guildPoints ?? 0}</b></span>}
                   <span className="game-results-total" data-label="Total" role="cell"><b>{player.total}</b></span>
                 </div>;
               })}
@@ -2444,6 +2459,24 @@ export function App() {
           </div>
         </section>;
       })()}
+      {game?.options.merchantsGuild && <Dialog open={modal === "guild"} onOpenChange={open => setModal(open ? "guild" : null)}>
+        <DialogContent className="game-dialog guild-panel">
+        <DialogTitle>Merchant Guilds</DialogTitle>
+        <DialogDescription>Deliver on your main turn. Every 2 deliveries earn 1 point, up to 2 points. Maximum 4 deliveries per player.</DialogDescription>
+        <div className="guild-progress">{game.players.map(player => <span key={player.id}>{player.name}: {player.guildDeliveries ?? 0}/4 · {guildPoints(player.guildDeliveries)} VP</span>)}</div>
+        <div className="guild-contracts">{(game.guildContracts ?? []).map(id => {
+          const contract = GUILD_CONTRACTS[id];
+          const completed = (me?.guildDeliveries ?? 0) >= 4;
+          const affordable = canAfford(contract.cost);
+          return <div className="guild-contract" key={id}>
+            <strong>{contract.name}</strong>
+            <span>{formatResourceHand({ ...emptyHand(), ...contract.cost })}</span>
+            {!spectator && <button type="button" className="btn" disabled={!active || game.secondary || completed || !affordable} onClick={() => act({ type: "deliverContract", id })}>
+              {completed ? "Guild complete" : !affordable ? "Need resources" : "Deliver"}
+            </button>}
+          </div>;
+        })}</div>
+      </DialogContent></Dialog>}
       {game && me && <TradeComposer open={modal === "trade"} onClose={() => setModal(null)} game={game} me={me} hand={hand} give={give} want={want} setGive={setGive} setWant={setWant} counterId={counterId} enabled={tradeInteractionEnabled} act={act} />}
       <Dialog
         open={modal === "color"}
@@ -2799,6 +2832,7 @@ export function App() {
                   : "Untimed discards"}
                 {room.options.showDiscardedCards ? " · visible discards" : " · anonymous discards"}
                 {room.options.autoRollDice ? " · auto-roll dice" : " · manual dice rolls"}
+                {room.options.merchantsGuild ? " · Merchant Guilds" : ""}
                 {room.options.linkedTwoTwelve ? " · 2 and 12 linked" : ""}
               </>
             ) : (

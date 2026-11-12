@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   emptyHand,
+  DEFAULT_OPTIONS,
   type GameView,
   type PublicPlayer,
 } from "../shared/game";
@@ -80,4 +81,18 @@ test("only development cards that can be played now count as remaining actions",
   player.dev = [{ type: "roadBuilding", bought: game.turn - 1 }];
   game.legal.roads = [];
   assert.equal(hasRemainingTurnAction(game, player), false);
+});
+
+
+test("affordable guild deliveries suppress the end-turn prompt until completion", () => {
+  const { game, player } = turnState();
+  game.legal = { ...game.legal, roads: [], settlements: [], cities: [] };
+  game.deckCount = 0;
+  player.resources = { ...emptyHand(), wheat: 2, sheep: 1 };
+  const guildGame = { ...game, options: { ...DEFAULT_OPTIONS, merchantsGuild: true }, guildContracts: [0, 1, 2] };
+  assert.equal(hasRemainingTurnAction(guildGame, player), true);
+  player.guildDeliveries = 4;
+  assert.equal(hasRemainingTurnAction(guildGame, player), false);
+  player.guildDeliveries = 0;
+  assert.equal(hasRemainingTurnAction({ ...guildGame, secondary: true }, player), false);
 });

@@ -1,3 +1,4 @@
+import { GUILD_CONTRACTS, guildPoints } from "./merchants";
 import { RESOURCES, formatResourceHand, resourceName, type Resource } from "./resources";
 export { RESOURCES, type Resource } from "./resources";
 export type Hand = Record<Resource, number>;
@@ -134,6 +135,7 @@ export interface Options extends MapGenerationRules {
   discardTimer: number;
   balanced: boolean;
   autoRollDice: boolean;
+  merchantsGuild: boolean;
   friendlyRobber: boolean;
   preventRepeatRobberTarget: boolean;
   linkedTwoTwelve: boolean;
@@ -155,6 +157,7 @@ export const DEFAULT_OPTIONS: Options = {
   discardTimer: 20,
   balanced: true,
   autoRollDice: false,
+  merchantsGuild: false,
   ...DEFAULT_MAP_GENERATION_RULES,
   friendlyRobber: false,
   preventRepeatRobberTarget: true,
@@ -228,6 +231,7 @@ export interface Player {
   roadLength: number;
   playedDev: boolean;
   automated?: boolean;
+  guildDeliveries?: number;
 }
 export type Phase =
   | "setupSettlement"
@@ -259,6 +263,8 @@ export interface GameLogEntry {
 export type PublicGameLogEntry = Omit<GameLogEntry, "privateText">;
 export interface Game {
   board: Board;
+  // Optional for games saved before the expansion was introduced.
+  guildContracts?: number[];
   players: Player[];
   options: Options;
   startedAt: number;
@@ -297,6 +303,7 @@ export function canResumeRoom(game: Pick<Game, "phase"> | null | undefined) {
   return game?.phase !== "finished";
 }
 export type Action =
+  | { type: "deliverContract"; id: number }
   | { type: "settlement" | "city" | "road"; id: number }
   | { type: "roll" | "end" | "buyDev" | "skipRoad" | "cancelTrade" }
   | { type: "discard"; cards: Hand }
@@ -325,6 +332,7 @@ export interface FinalPlayerResult {
   longestRoad: number;
   largestArmy: number;
   victoryCards: number;
+  guildPoints?: number;
   total: number;
 }
 export interface GameResults {
@@ -798,6 +806,7 @@ export function createGame(
       knights: 0,
       roadLength: 0,
       playedDev: false,
+      guildDeliveries: 0,
     })),
     options: gameOptions,
     startedAt: Date.now(),
@@ -839,6 +848,8 @@ export function createGame(
   };
   g.robber = g.board.tiles.find((t) => t.terrain === "desert")!.id;
   g.deck = shuffle<Dev>(developmentDeck(players.length), g, random);
+  if (gameOptions.merchantsGuild)
+    g.guildContracts = shuffle(GUILD_CONTRACTS.map((_, id) => id), g, random).slice(0, 3);
   note(
     g,
     "The island is ready. Place two settlements and roads in reverse order.",
@@ -938,6 +949,7 @@ export function points(g: Game, p: Player, hidden = true) {
     (vertex) => vertex.owner === p.id && vertex.city,
   ).length;
   return settlements + cities * 2 +
+    (g.options.merchantsGuild ? guildPoints(p.guildDeliveries) : 0) +
     (g.longest === p.id ? 2 : 0) +
     (g.army === p.id ? 2 : 0) +
     (hidden ? p.dev.filter((d) => d.type === "victory").length : 0);
@@ -969,8 +981,10 @@ export function finalGameResults(
       longestRoad,
       largestArmy,
       victoryCards,
+      ...(g.options.merchantsGuild ? { guildPoints: guildPoints(player.guildDeliveries) } : {}),
       total:
-        settlements + cities * 2 + longestRoad + largestArmy + victoryCards,
+        settlements + cities * 2 + longestRoad + largestArmy + victoryCards +
+        (g.options.merchantsGuild ? guildPoints(player.guildDeliveries) : 0),
     };
   });
   players.sort(
@@ -1347,7 +1361,7 @@ export function applyAction(
   const g = structuredClone(game);
   const earnsTurnTime =
     !game.phase.startsWith("setup") &&
-    ["settlement", "city", "road", "dev"].includes(action.type);
+    ["settlement", "city", "road", "dev", "deliverContract"].includes(action.type);
   const hasTimedTurn =
     game.phase === "freeRoad"
       ? game.resumeTime !== null
@@ -1508,6 +1522,23 @@ function mutate(g: Game, id: string, a: Action, random?: RandomSource) {
   }
   ensure(g.players[g.current].id === id, "It's another player's turn.");
   ensure(!g.offer || a.type === "offer", "Finish the open trade first.");
+  if (a.type === "deliverContract") {
+    ensure(g.options.merchantsGuild, "Merchant Guilds is not enabled.");
+    ensure(g.phase === "main" && !g.secondary, "Deliver contracts during your main turn.");
+    ensure((p.guildDeliveries ?? 0) < 4, "You have completed all four guild deliveries.");
+    const market = g.guildContracts;
+    ensure(market && Number.isInteger(a.id) && market.includes(a.id), "That contract is no longer available.");
+    const contract = GUILD_CONTRACTS[a.id];
+    ensure(contract, "Choose an available contract.");
+    pay(g, p, contract.cost);
+    p.guildDeliveries = (p.guildDeliveries ?? 0) + 1;
+    const replacements = GUILD_CONTRACTS.map((_, id) => id)
+      .filter((id) => !market.includes(id));
+    market[market.indexOf(a.id)] =
+      replacements[Math.floor(randomValue(g, random) * replacements.length)];
+    note(g, `${p.name} delivers ${formatResourceHand({ ...emptyHand(), ...contract.cost })} for ${contract.name} (${p.guildDeliveries}/4 deliveries, ${guildPoints(p.guildDeliveries)} guild points).`, "trade");
+    return;
+  }
   if (a.type === "settlement") {
     const setup = g.phase === "setupSettlement";
     ensure(setup || g.phase === "main", "You cannot build a settlement now.");
